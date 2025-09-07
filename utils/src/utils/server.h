@@ -19,9 +19,9 @@
  * @param puerto: puerto del servidor que estamos creando
  * @return int: ID del file descriptor del socket del servidor
  * 
- * @example int socketServidor = iniciar_servidor("192.168.0.1", 2340);
+ * @example int socket = start_server("192.168.0.1", "2340");
  */
-int iniciar_servidor(char *ip, char *puerto);
+int start_server(char *ip, char *puerto);
 
 /**
  * @brief Inicia un cliente conectandose a un servidor en la ip y puerto correspondientes
@@ -30,7 +30,7 @@ int iniciar_servidor(char *ip, char *puerto);
  * @param puerto: puerto del servidor al cual nos conectamos
  * @return int: ID del file descriptor del socket creado con el servidor
  * 
- * @example int socketCliente = conectar_a_servidor("192.168.0.1", 2340);
+ * @example int socket = conectar_a_servidor("192.168.0.1", "2340");
  */
 int conectar_a_servidor(char *ip, char *puerto);
 

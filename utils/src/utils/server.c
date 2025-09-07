@@ -1,9 +1,7 @@
 #include "server.h"
 
-int iniciar_servidor(char *ip, char *puerto) {
-	int socket_servidor;
-
-	struct addrinfo hints, *servinfo;
+int start_server(char *ip, char *port) {
+    struct addrinfo hints, *server_info;
 
     // Configuramos el socket
     memset(&hints, 0, sizeof(hints));
@@ -11,45 +9,44 @@ int iniciar_servidor(char *ip, char *puerto) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    int rv = getaddrinfo(ip, puerto, &hints, &servinfo);
-    if (rv != 0) {
-        printf("getaddrinfo error: %s\n", gai_strerror(rv));
-        freeaddrinfo(servinfo);
+    int result = getaddrinfo(ip, port, &hints, &server_info);
+    if (result != 0) {
+        printf("getaddrinfo error: %s\n", gai_strerror(result));
         return -1;
     }
 
-	// Creamos el socket de escucha del servidor
-        int serverSocket = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
-    if (serverSocket == -1) {
-        printf("Socket creation error\n%s", strerror(errno));
-        freeaddrinfo(servinfo);
+    // Creamos el socket de escucha del servidor
+    int server_socket = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
+    if (server_socket == -1) {
+        printf("Socket creation error\n%s\n", strerror(errno));
+        freeaddrinfo(server_info);
         return -1;
     }
 
-	// Asociamos el socket a un puerto. Verifico si se asoció correctamente
+    // Asociamos el socket a un puerto. Verifico si se asoció correctamente
     int yes = 1;
-    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-        printf("setsockopt error\n%s", strerror(errno));
-        freeaddrinfo(servinfo);
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+        printf("setsockopt error\n%s\n", strerror(errno));
+        freeaddrinfo(server_info);
+        close(server_socket);
         return -1;
     }
 
     // Bindeo el puerto al socket
-    if (bind(serverSocket, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
-        close(serverSocket);
-        printf("Bind error\n%s", strerror(errno));
-        freeaddrinfo(servinfo);
+    if (bind(server_socket, server_info->ai_addr, server_info->ai_addrlen) == -1) {
+        close(server_socket);
+        printf("Bind error\n%s\n", strerror(errno));
+        freeaddrinfo(server_info);
         return -1;
     }
 
-	// Escuchamos las conexiones entrantes
-    if (listen(serverSocket, SOMAXCONN) == -1) {
-        printf("Listen error\n%s", strerror(errno));
-        freeaddrinfo(servinfo);
+    // Escuchamos las conexiones entrantes
+    if (listen(server_socket, SOMAXCONN) == -1) {
+        printf("Listen error\n%s\n", strerror(errno));
+        freeaddrinfo(server_info);
         return -1;
     }
-    socket_servidor = serverSocket;
-	freeaddrinfo(servinfo);
+    freeaddrinfo(server_info);
 
-	return socket_servidor;
+    return server_socket;
 }
