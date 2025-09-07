@@ -5,7 +5,7 @@ int conectar_servidor(char *ip, char *puerto)
     struct addrinfo hints, *server_info;
 
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;       // IPv6
+    hints.ai_family = AF_INET;       // IPv4
     hints.ai_socktype = SOCK_STREAM; // TCP
 
     // Arma la información de la dirección del socket
@@ -15,7 +15,7 @@ int conectar_servidor(char *ip, char *puerto)
         &hints,
         &server_info);
 
-    if (resultado_obtener_server_info == -1)
+    if (resultado_obtener_server_info != 0)
     {
         return -1;
     }
@@ -28,6 +28,7 @@ int conectar_servidor(char *ip, char *puerto)
 
     if (socket_cliente == -1)
     {
+        freeaddrinfo(server_info);
         return -1;
     }
 
@@ -39,6 +40,7 @@ int conectar_servidor(char *ip, char *puerto)
 
     if (resultado_conexion == -1)
     {
+        freeaddrinfo(server_info);
         return -1;
     }
 
