@@ -47,3 +47,9 @@ int conectar_servidor(char *ip, char *puerto)
 
     return socket_cliente;
 }
+
+void liberar_conexion(int socket_cliente) {
+    if (socket_cliente != -1) {
+        close(socket_cliente);
+    }
+}
