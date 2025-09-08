@@ -16,13 +16,13 @@
  * @param server_port Puerto del servidor
  * @return El descriptor del socket del cliente o un -1 si hubo un error.
  */
-int client_connect(char *server_ip, char *server_port);
+int client_connect(const char *server_ip, const char *server_port);
 
 /**
  * Cierra el socket del cliente
  *
  * @param client_socket Descriptor del socket del cliente
  */
-void client_disconnect(int client_socket);
+void client_disconnect(const int client_socket);
 
 #endif

@@ -1,7 +1,11 @@
 #include "client_socket.h"
 
-int client_connect(char *server_ip, char *server_port)
+int client_connect(const char *server_ip, const char *server_port)
 {
+    if (server_ip == NULL || server_port == NULL) {
+        goto error;
+    }
+
     struct addrinfo hints, *server_info = NULL;
     int client_socket = -1;
     int getaddrinfo_result;
@@ -47,7 +51,7 @@ int client_connect(char *server_ip, char *server_port)
 clean_socket:
     close(client_socket);
 clean_addrinfo:
-    freeaddrinfo(server_info);
+    if (server_info != NULL) freeaddrinfo(server_info);
 error:
     return -1;
 }
