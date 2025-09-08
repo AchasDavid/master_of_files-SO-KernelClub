@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-t_log* crear_logger_en_directorio_trabajo(char *process_name, bool is_active_console, char* s_level) {
+t_log* log_create_in_working_dir(char *process_name, bool is_active_console, char* s_level) {
     char directorio_actual[PATH_MAX];
     char ruta_log[PATH_MAX];
 
@@ -31,30 +31,30 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
     
-    char* ruta_archivo_config = argv[1];
+    char* config_file_path = argv[1];
 
-    t_config* config = config_create(ruta_archivo_config);
+    t_config* config = config_create(config_file_path);
     if (!config) {
         perror("No se pudo abrir el config");
         exit(EXIT_FAILURE);
     }
 
 
-    char* ip_master = config_get_string_value(config, "IP_MASTER");
-    char* puerto_master = config_get_string_value(config, "PUERTO_MASTER");
+    char* master_ip = config_get_string_value(config, "IP_MASTER");
+    char* master_port = config_get_string_value(config, "PUERTO_MASTER");
     char* log_level = config_get_string_value(config, "LOG_LEVEL");
 
-    t_log* logger = crear_logger_en_directorio_trabajo("worker", true, log_level);
+    t_log* logger = log_create_in_working_dir("worker", true, log_level);
 
-    int socket_cliente = conectar_servidor(ip_master, puerto_master);
+    int client_socket = conectar_servidor(master_ip, master_port);
 
-    if (socket_cliente < 0) {
+    if (client_socket < 0) {
         config_destroy(config);
         log_destroy(logger);
         exit(EXIT_FAILURE);
     }
 
-    log_info(logger, "## Se establecio conexión con Master %s:%s", ip_master, puerto_master);
+    log_info(logger, "## Se establecio conexión con Master %s:%s", master_ip, master_port);
 
     config_destroy(config);
     log_destroy(logger);
