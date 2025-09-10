@@ -2,12 +2,14 @@
 #define SERIALIZATION_UTILS_H
 
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct
 {
-    size_t size;  // Tamaño del buffer
-    void *stream; // Contenido del buffer
-    void *offset; // Desplazamiento dentro del buffer
+    size_t size;     // Tamaño usado del buffer
+    size_t capacity; // Capacidad total del buffer
+    void *stream;    // Contenido del buffer
+    void *offset;    // Desplazamiento dentro del buffer
 } t_buffer;
 
 typedef struct
@@ -18,15 +20,20 @@ typedef struct
 
 /**
  * Crear un buffer
- * @param buffer_size Tamaño del stream del buffer
+ * @param capacity Tamaño del stream del buffer
  * @return Un buffer
  */
-t_buffer *buffer_create(size_t buffer_size);
+t_buffer *buffer_create(size_t capacity);
 
 /**
  * Libera el espacio de memoria del buffer
  * @param buffer El buffer que se quiere eliminar
  */
 void buffer_destroy(t_buffer *buffer);
+
+void buffer_write_uint8(t_buffer *buffer, uint8_t value);
+void buffer_write_uint16(t_buffer *buffer, uint16_t value);
+void buffer_write_uint32(t_buffer *buffer, uint32_t value);
+void buffer_write_string(t_buffer *buffer, char *value);
 
 #endif
