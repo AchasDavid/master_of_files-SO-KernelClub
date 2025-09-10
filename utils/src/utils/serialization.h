@@ -2,14 +2,15 @@
 #define SERIALIZATION_UTILS_H
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
+#include <commons/string.h>
 
 typedef struct
 {
-    size_t size;     // Tamaño usado del buffer
-    size_t capacity; // Capacidad total del buffer
-    void *stream;    // Contenido del buffer
-    void *offset;    // Desplazamiento dentro del buffer
+    size_t size;   // Tamaño del buffer
+    void *stream;  // Contenido del buffer
+    size_t offset; // Desplazamiento dentro del buffer
 } t_buffer;
 
 typedef struct
