@@ -1,47 +1,97 @@
 #include "worker_config.h"
 
-static bool has_required_properties(t_config *config);
-static char *duplicate_config_value(char *value, t_config *config, t_worker_config *wk);
+#define ARRAY_LENGTH(a) (sizeof(a) / sizeof((a)[0]))
+
+typedef struct
+{
+    
+    char *key;
+    char **field;
+} t_str_valid_field;
+
+typedef struct
+{
+    char *key;
+    int *field;
+} t_int_valid_field;
 
 t_worker_config *create_worker_config(char *config_file_path)
 {
+    t_config *config = config_create(config_file_path);
+    if (!config)
+    {
+        fprintf(stderr, "No se pudo abrir el archivo config %s\n", config_file_path);
+        return NULL;
+    }
+
     t_worker_config *worker_config = malloc(sizeof *worker_config);
     if (!worker_config)
     {
         fprintf(stderr, "No se pudo reservar memoria para worker_config\n");
-        return NULL;
-    }
-
-    t_config *config = config_create((char *)config_file_path);
-    if (!config)
-    {
-        fprintf(stderr, "No se pudo abrir el config: %s\n", config_file_path);
-        free(worker_config);
-        return NULL;
-    }
-
-    if (!has_required_properties(config))
-    {
-        fprintf(stderr, "El archivo de configuración no tiene todas las propiedades requeridas: %s\n",
-                config_file_path);
         config_destroy(config);
-        free(worker_config);
         return NULL;
     }
 
-    worker_config->master_ip = duplicate_config_value(config_get_string_value(config, "IP_MASTER"), config, worker_config);
-    worker_config->master_port = duplicate_config_value(config_get_string_value(config, "PUERTO_MASTER"), config, worker_config);
-    worker_config->storage_ip = duplicate_config_value(config_get_string_value(config, "IP_STORAGE"), config, worker_config);
-    worker_config->storage_port = duplicate_config_value(config_get_string_value(config, "PUERTO_STORAGE"), config, worker_config);
-    worker_config->replacement_algorithm = duplicate_config_value(config_get_string_value(config, "ALGORITMO_REEMPLAZO"), config, worker_config);
-    worker_config->path_scripts = duplicate_config_value(config_get_string_value(config, "PATH_SCRIPTS"), config, worker_config);
-    worker_config->log_level = duplicate_config_value(config_get_string_value(config, "LOG_LEVEL"), config, worker_config);
+    t_str_valid_field str_fields[] = {
+        {"IP_MASTER", &worker_config->master_ip},
+        {"PUERTO_MASTER", &worker_config->master_port},
+        {"IP_STORAGE", &worker_config->storage_ip},
+        {"PUERTO_STORAGE", &worker_config->storage_port},
+        {"ALGORITMO_REEMPLAZO", &worker_config->replacement_algorithm},
+        {"PATH_SCRIPTS", &worker_config->path_scripts},
+        {"LOG_LEVEL", &worker_config->log_level},
+    };
 
-    worker_config->memory_size = config_get_int_value(config, "TAM_MEMORIA");
-    worker_config->memory_retardation = config_get_int_value(config, "RETARDO_MEMORIA");
+    for (size_t i = 0; i < ARRAY_LENGTH(str_fields); i++)
+    {
+        bool has_property = config_has_property(config, str_fields[i].key);
+        if (!has_property)
+        {
+            fprintf(stderr, "Falta una clave: %s\n", str_fields[i].key);
+            goto error;
+        }
+
+        const char *original_value = config_get_string_value(config, str_fields[i].key);
+        if (!original_value || *original_value == '\0')
+        {
+            fprintf(stderr, "Clave sin valor: %s\n", str_fields[i].key);
+            goto error;
+        }
+
+        *str_fields[i].field = strdup(original_value);
+        if (!*str_fields[i].field)
+        {
+            fprintf(stderr, "strdup fallo en: %s\n", str_fields[i].key);
+            goto error;
+        }
+    }
+
+    t_int_valid_field int_fields[] = {
+        {"TAM_MEMORIA", &worker_config->memory_size},
+        {"RETARDO_MEMORIA", &worker_config->memory_retardation},
+    };
+
+    for (size_t i = 0; i < ARRAY_LENGTH(int_fields); i++)
+    {
+        bool has_property = config_has_property(config, int_fields[i].key);
+
+        if (!has_property)
+        {
+            fprintf(stderr, "Falta una clave: %s\n", int_fields[i].key);
+            goto error;
+        }
+
+        int original_value = config_get_int_value(config, int_fields[i].key);
+        *int_fields[i].field = original_value;
+    }
 
     config_destroy(config);
     return worker_config;
+
+error:
+    config_destroy(config);
+    destroy_worker_config(worker_config);
+    return NULL;
 }
 
 void destroy_worker_config(t_worker_config *worker_config)
@@ -58,49 +108,4 @@ void destroy_worker_config(t_worker_config *worker_config)
     free(worker_config->log_level);
 
     free(worker_config);
-}
-
-static bool has_required_properties(t_config *config)
-{
-    char *required_props[] = {
-        "IP_MASTER",
-        "PUERTO_MASTER",
-        "IP_STORAGE",
-        "PUERTO_STORAGE",
-        "TAM_MEMORIA",
-        "RETARDO_MEMORIA",
-        "ALGORITMO_REEMPLAZO",
-        "PATH_SCRIPTS",
-        "LOG_LEVEL"};
-
-    size_t n = sizeof(required_props) / sizeof(required_props[0]);
-    for (size_t i = 0; i < n; ++i)
-    {
-        if (!config_has_property(config, required_props[i]))
-        {
-            fprintf(stderr, "Falta propiedad requerida: %s\n", required_props[i]);
-            return false;
-        }
-    }
-    return true;
-}
-
-static char *duplicate_config_value(char *value, t_config *config, t_worker_config *worker_config)
-{
-    if (!value)
-    {
-        fprintf(stderr, "Valor de configuración es NULL\n");
-        config_destroy(config);
-        destroy_worker_config(worker_config);
-        exit(EXIT_FAILURE);
-    }
-    char *duplicate = strdup(value);
-    if (!duplicate)
-    {
-        fprintf(stderr, "strdup fallo\n");
-        config_destroy(config);
-        destroy_worker_config(worker_config);
-        exit(EXIT_FAILURE);
-    }
-    return duplicate;
 }
