@@ -2,7 +2,8 @@
 #include <errno.h>
 
 static bool has_required_properties(t_config *config);
-static char *duplicate_config_value(char *value, t_config *config, t_storage_config *wk);
+static char *duplicate_config_value(char *value, t_config *config, t_storage_config *storage_config);
+static void handle_fatal_error(t_config *config, t_storage_config *storage_config);
 
 t_storage_config *create_storage_config(const char *config_file_path)
 {
