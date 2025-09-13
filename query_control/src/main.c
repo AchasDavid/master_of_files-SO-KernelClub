@@ -15,7 +15,10 @@ int main(int argc, char* argv[])
 {
     char* config_filepath = argv[1];
     char* query_filepath = argv[2];
-    char* priority_str = argv[3];
+    char* priority = argv[3];
+    // PATH_MAX para la ruta del query + 1 para el delimiter 0x1F + 9 para la prioridad (max 99999999) + '\0'
+    char send_buffer[PATH_MAX+1+9];
+    char response_buffer[256];
     int retval = 0;
 
     if (argc != 4) {
@@ -63,26 +66,26 @@ int main(int argc, char* argv[])
     }
 
     log_info(logger, "## Conexión al Master exitosa. IP: %s, Puerto: %s", query_control_config->ip, query_control_config->port);
+    log_info(logger, "## Solicitud de ejecución de Query: %s, prioridad: %s", query_filepath, priority);
 
-    char* handshake_msg = "QUERY_CONTROL_HANDSHAKE";
-    if (send(master_socket, handshake_msg, strlen(handshake_msg), 0) == -1) {
-        log_error(logger, "Error al enviar handshake al master");
+    snprintf(send_buffer, sizeof(send_buffer), "%s\x1F%s", query_filepath, priority);
+    if (send(master_socket, send_buffer, strlen(send_buffer), 0) == -1)
+    {
+        log_error(logger, "Error al enviar el path de query y prioridad al master");
         retval = -6;
         goto clean_socket;
     }
 
-    char response_buffer[256];
     int response_bytes = recv(master_socket, response_buffer, sizeof(response_buffer) - 1, 0);
     if (response_bytes <= 0) {
-        log_error(logger, "Error al recibir respuesta del handshake del master");
+        log_error(logger, "Error al recibir respuesta del query del master");
         retval = -7;
         goto clean_socket;
     }
 
     response_buffer[response_bytes] = '\0';
-    log_debug(logger, "Handshake completado con el master. Respuesta: %s", response_buffer);
 
-    // TODO: Enviar el query file y manejar la respuesta
+    // TODO: Manejar la respuesta
 
 clean_socket:
     close(master_socket);
