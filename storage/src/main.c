@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
         strncpy(config_file_path, argv[1], PATH_MAX - 1);
         config_file_path[PATH_MAX - 1] = '\0';
     } else {
-        fprintf(stderr, "Solo se puede ingresar el argumento [archivo_config]");
+        fprintf(stderr, "Solo se puede ingresar el argumento [archivo_config]\n");
         goto error;
     }
 
