@@ -2,6 +2,7 @@
 #include <utils/utils.h>
 #include <query_control_manager.h>
 #include <config/master_config.h>
+#include <utils/protocol.h>
 #include <commons/config.h>
 #include <commons/log.h>
 #include <linux/limits.h>
@@ -137,6 +138,9 @@ void* handle_client(void* arg) {
     }
 
     buffer[bytes_received] = '\0';
+
+    // Verificar op code recibido
+    t_message_op_code op_code= check_message_op_code(buffer);
     
     // Verificar si es un handshake de Query Control
     if (strcmp(buffer, "QUERY_CONTROL_HANDSHAKE") == 0) {
