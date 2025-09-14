@@ -74,7 +74,8 @@ int main(int argc, char* argv[])
     log_info(logger, "## Conexión al Master exitosa. IP: %s, Puerto: %s", query_control_config->ip, query_control_config->port);
     log_info(logger, "## Solicitud de ejecución de Query: %s, prioridad: %d", query_filepath, priority);
 
-    snprintf(send_buffer, sizeof(send_buffer), "%s\x1F%d", query_filepath, priority);
+    snprintf(send_buffer, sizeof(send_buffer), "QUERY_FILE_PATH\x1F%s\x1F%d", query_filepath, priority);
+    printf("Enviando al master: %s\n", send_buffer);
     if (send(master_socket, send_buffer, strlen(send_buffer) + 1, 0) == -1)
     {
         log_error(logger, "Error al enviar el path de query y prioridad al master");
