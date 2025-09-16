@@ -10,9 +10,11 @@
 #include <config/storage_config.h>
 #include <utils/utils.h>
 #include <string.h>
+#include "globals/globals.h"
+#include "server/server.h"
 
 t_storage_config* g_storage_config;
-t_log* g_storage_logger;
+t_log* g_storage_logger = NULL;
 
 int main(int argc, char* argv[]) {
     char config_file_path[PATH_MAX];
@@ -44,12 +46,12 @@ int main(int argc, char* argv[]) {
     log_info(g_storage_logger, "Servidor iniciado en %s:%s", g_storage_config->storage_ip, g_storage_config->storage_port);
 
     destroy_storage_config(g_storage_config);
-    //logger_destroy(); TODO: Agregar cuando se haga refactor de logger
+    log_destroy(g_storage_logger);
     exit(EXIT_SUCCESS);
 
 clean:
     destroy_storage_config(g_storage_config);
-    //logger_destroy(); TODO: Agregar cuando se haga refactor de logger
+    log_destroy(g_storage_logger);
 error:
     exit(EXIT_FAILURE);
 }
