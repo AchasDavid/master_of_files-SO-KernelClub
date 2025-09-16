@@ -218,7 +218,7 @@ int package_send(t_package *package, int socket)
 
     free(serialized_package);
     package_destroy(package);
-
+  
     return 0;
 }
 
