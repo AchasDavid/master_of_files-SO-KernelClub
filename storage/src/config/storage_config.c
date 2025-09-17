@@ -32,11 +32,18 @@ t_storage_config *create_storage_config(const char *config_file_path)
     }
 
     storage_config->storage_ip = duplicate_config_value(config_get_string_value(config, "STORAGE_IP"), config, storage_config);
-    storage_config->storage_port = duplicate_config_value(config_get_string_value(config, "STORAGE_PORT"), config, storage_config);
-    storage_config->fresh_start = duplicate_config_value(config_get_string_value(config, "FRESH_START"), config, storage_config);
-    storage_config->module_path = duplicate_config_value(config_get_string_value(config, "MODULE_PATH"), config, storage_config);
-    storage_config->operation_delay = duplicate_config_value(config_get_string_value(config, "OPERATION_DELAY"), config, storage_config);
-    storage_config->block_access_delay = duplicate_config_value(config_get_string_value(config, "BLOCK_ACCESS_DELAY"), config, storage_config);
+    storage_config->puerto_escucha = config_get_int_value(config, "PUERTO_ESCUCHA");
+    
+    char* fresh_start_str = config_get_string_value(config, "FRESH_START");
+    if (strcmp(fresh_start_str, "TRUE") == 0 || strcmp(fresh_start_str, "true") == 0) {
+        storage_config->fresh_start = true;
+    } else {
+        storage_config->fresh_start = false;
+    }
+    
+    storage_config->punto_montaje = duplicate_config_value(config_get_string_value(config, "PUNTO_MONTAJE"), config, storage_config);
+    storage_config->retardo_operacion = config_get_int_value(config, "RETARDO_OPERACION");
+    storage_config->retardo_acceso_bloque = config_get_int_value(config, "RETARDO_ACCESO_BLOQUE");
     storage_config->log_level = duplicate_config_value(config_get_string_value(config, "LOG_LEVEL"), config, storage_config);
 
     config_destroy(config);
@@ -49,11 +56,11 @@ void destroy_storage_config(t_storage_config *storage_config)
         return;
 
     free(storage_config->storage_ip);
-    free(storage_config->storage_port);
-    free(storage_config->fresh_start);
-    free(storage_config->module_path);
-    free(storage_config->operation_delay);
-    free(storage_config->block_access_delay);
+    // puerto_escucha es int, no necesita free
+    // fresh_start es bool, no necesita free
+    free(storage_config->punto_montaje);
+    // retardo_operacion es int, no necesita free
+    // retardo_acceso_bloque es int, no necesita free
     free(storage_config->log_level);
 
     free(storage_config);
@@ -63,11 +70,11 @@ static bool has_required_properties(t_config *config)
 {
     char *required_props[] = {
         "STORAGE_IP",
-        "STORAGE_PORT",
+        "PUERTO_ESCUCHA",
         "FRESH_START",
-        "MODULE_PATH",
-        "OPERATION_DELAY",
-        "BLOCK_ACCESS_DELAY",
+        "PUNTO_MONTAJE",
+        "RETARDO_OPERACION",
+        "RETARDO_ACCESO_BLOQUE",
         "LOG_LEVEL"
     };
 
