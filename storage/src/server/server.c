@@ -1,6 +1,4 @@
 #include "server.h"
-#include "operations/operations.h"
-#include "operations/handshake.h"
 
 int wait_for_client(int server_socket)
 {
@@ -10,11 +8,12 @@ int wait_for_client(int server_socket)
 	// Aceptamos un nuevo cliente
     int client_socket = accept(server_socket, (void*)&client_address, &address_size);
     if (client_socket == -1) {
-        log_error(g_storage_logger, "Error al aceptar un cliente.");
+        log_error(g_storage_logger, "Error al aceptar un Worker.");
         return -1;
     }
 
-	log_info(g_storage_logger, "Se conectó un cliente.");
+	g_worker_counter++;
+    log_info(g_storage_logger, "## Se conecta un Worker - Cantidad de Workers: %d", g_worker_counter); // TODO: Loggear la cantidad de workers conectados
 
 	return client_socket;
 }

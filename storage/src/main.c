@@ -20,6 +20,7 @@
 
 t_storage_config* g_storage_config;
 t_log* g_storage_logger;
+int g_worker_counter = 0;
 
 int main(int argc, char* argv[]) {
     // Obtiene posibles parametros de entrada

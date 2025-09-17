@@ -15,5 +15,6 @@ typedef struct {
 
 extern t_log* g_storage_logger;
 extern t_storage_config* g_storage_config;
+int g_worker_counter;
 
 #endif

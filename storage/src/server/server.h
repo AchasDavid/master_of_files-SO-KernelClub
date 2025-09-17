@@ -12,6 +12,8 @@
 #include<assert.h>
 #include "globals/globals.h"
 #include "utils/serialization.h"
+#include "operations/operations.h"
+#include "operations/handshake.h"
 
 typedef struct {
     int client_socket;
