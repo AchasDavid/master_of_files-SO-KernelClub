@@ -182,12 +182,13 @@ char *buffer_read_string(t_buffer *buffer)
     return value;
 }
 
-t_package *package_create(size_t operation_code)
+t_package *package_create(size_t operation_code, t_buffer *buffer)
 {
     t_package *package = malloc(sizeof(t_package));
     if (!package)
         return NULL;
     package->operation_code = operation_code;
+    package->buffer = buffer;
     return package;
 }
 
