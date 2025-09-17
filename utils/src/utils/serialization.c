@@ -188,6 +188,10 @@ t_package *package_create(size_t operation_code, t_buffer *buffer)
     if (!package)
         return NULL;
     package->operation_code = operation_code;
+    if (!buffer) {
+        free(package);
+        return NULL;
+    }
     package->buffer = buffer;
     return package;
 }
