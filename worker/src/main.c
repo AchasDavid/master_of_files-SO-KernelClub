@@ -41,19 +41,19 @@ int main(int argc, char *argv[])
     }
     log_info(logger, "## Se establecio conexión con Master. IP=%s:%s", worker_config->master_ip, worker_config->master_port);
 
-    int client_socket_storage = client_connect(worker_config->storage_ip, worker_config->storage_port);
-    if (client_socket_storage < 0)
-    {
-        log_error(logger, "## No se pudo establecer conexión con Master. IP=%s:%s", worker_config->storage_ip, worker_config->storage_port);
-        goto clean;
-    }
+    // int client_socket_storage = client_connect(worker_config->storage_ip, worker_config->storage_port);
+    // if (client_socket_storage < 0)
+    // {
+    //     log_error(logger, "## No se pudo establecer conexión con Master. IP=%s:%s", worker_config->storage_ip, worker_config->storage_port);
+    //     goto clean;
+    // }
 
-    log_info(logger, "## Se establecio conexión con Storage. IP=%s:%s", worker_config->storage_ip, worker_config->storage_port);
+    // log_info(logger, "## Se establecio conexión con Storage. IP=%s:%s", worker_config->storage_ip, worker_config->storage_port);
 
     destroy_worker_config(worker_config);
     logger_destroy();
     close(client_socket_master);
-    close(client_socket_storage);
+    // close(client_socket_storage);
     exit(EXIT_SUCCESS);
 
 clean:
