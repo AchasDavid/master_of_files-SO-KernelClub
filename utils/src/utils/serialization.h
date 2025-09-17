@@ -62,7 +62,7 @@ void package_destroy(t_package *package);
  * @param package Paquete a enviar (ya creado y cargado con datos)
  * @param socket Descriptor del socket por donde se enviará el paquete
  */
-void package_send(t_package *package, int socket);
+int package_send(t_package *package, int socket);
 
 /**
  * Recibe un paquete desde un socket
