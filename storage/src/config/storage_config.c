@@ -33,8 +33,11 @@ t_storage_config *create_storage_config(const char *config_file_path)
 
     storage_config->storage_ip = duplicate_config_value(config_get_string_value(config, "STORAGE_IP"), config, storage_config);
     storage_config->puerto_escucha = config_get_int_value(config, "PUERTO_ESCUCHA");
-    
+
     char* fresh_start_str = config_get_string_value(config, "FRESH_START");
+    if (!fresh_start_str) {
+      return NULL;
+    }
     if (strcmp(fresh_start_str, "TRUE") == 0 || strcmp(fresh_start_str, "true") == 0) {
         storage_config->fresh_start = true;
     } else {
