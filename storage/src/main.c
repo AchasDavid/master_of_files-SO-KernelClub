@@ -54,25 +54,24 @@ int main(int argc, char* argv[]) {
     }
 
     log_debug(g_storage_logger,
-              "Configuracion leida: \\n\\tSTORAGE_IP=%s\\n\\tPUERTO_ESCUCHA=%d\\n\\tFRESH_START=%s\\n\\tPUNTO_MONTAJE=%s\\n\\tRETARDO_OPERACION=%d\\n\\tRETARDO_ACCESO_BLOQUE=%d\\n\\tLOG_LEVEL=%s",
-              g_storage_config->storage_ip,
+              "Configuracion leida: \\n\\tPUERTO_ESCUCHA=%d\\n\\tFRESH_START=%s\\n\\tPUNTO_MONTAJE=%s\\n\\tRETARDO_OPERACION=%d\\n\\tRETARDO_ACCESO_BLOQUE=%d\\n\\tLOG_LEVEL=%s",
               g_storage_config->puerto_escucha,
               g_storage_config->fresh_start ? "TRUE" : "FALSE",
               g_storage_config->punto_montaje,
               g_storage_config->retardo_operacion,
               g_storage_config->retardo_acceso_bloque,
-              g_storage_config->log_level);
+              log_level_as_string(g_storage_config->log_level));
 
     char puerto_str[16];
     snprintf(puerto_str, sizeof(puerto_str), "%d", g_storage_config->puerto_escucha);
-    
-    int socket = start_server(g_storage_config->storage_ip, puerto_str);
+
+    int socket = start_server("127.0.0.1", puerto_str);
     if (socket < 0) {
-        log_error(g_storage_logger, "No se pudo iniciar el servidor en %s:%d", g_storage_config->storage_ip, g_storage_config->puerto_escucha);
+        log_error(g_storage_logger, "No se pudo iniciar el servidor en el puerto %d", g_storage_config->puerto_escucha);
         retval = -5;
         goto clean_logger;
     }
-    log_info(g_storage_logger, "Servidor iniciado en %s:%d", g_storage_config->storage_ip, g_storage_config->puerto_escucha);
+    log_info(g_storage_logger, "Servidor iniciado en el puerto %d", g_storage_config->puerto_escucha);
 
     close(socket);
     log_destroy(g_storage_logger);

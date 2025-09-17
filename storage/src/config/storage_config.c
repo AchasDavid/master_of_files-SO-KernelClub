@@ -2,8 +2,6 @@
 #include <errno.h>
 
 static bool has_required_properties(t_config *config);
-static char *duplicate_config_value(char *value, t_config *config, t_storage_config *storage_config);
-static void handle_fatal_error(t_config *config, t_storage_config *storage_config);
 
 t_storage_config *create_storage_config(const char *config_file_path)
 {
@@ -31,12 +29,11 @@ t_storage_config *create_storage_config(const char *config_file_path)
         return NULL;
     }
 
-    storage_config->storage_ip = duplicate_config_value(config_get_string_value(config, "STORAGE_IP"), config, storage_config);
     storage_config->puerto_escucha = config_get_int_value(config, "PUERTO_ESCUCHA");
 
     char* fresh_start_str = config_get_string_value(config, "FRESH_START");
     if (!fresh_start_str) {
-      return NULL;
+        goto cleanup;
     }
     if (strcmp(fresh_start_str, "TRUE") == 0 || strcmp(fresh_start_str, "true") == 0) {
         storage_config->fresh_start = true;
@@ -44,13 +41,31 @@ t_storage_config *create_storage_config(const char *config_file_path)
         storage_config->fresh_start = false;
     }
     
-    storage_config->punto_montaje = duplicate_config_value(config_get_string_value(config, "PUNTO_MONTAJE"), config, storage_config);
+    char* punto_montaje_str = config_get_string_value(config, "PUNTO_MONTAJE");
+    if (!punto_montaje_str) {
+        goto cleanup;
+    }
+    storage_config->punto_montaje = strdup(punto_montaje_str);
+    if (!storage_config->punto_montaje) {
+        goto cleanup;
+    }
+    
     storage_config->retardo_operacion = config_get_int_value(config, "RETARDO_OPERACION");
     storage_config->retardo_acceso_bloque = config_get_int_value(config, "RETARDO_ACCESO_BLOQUE");
-    storage_config->log_level = duplicate_config_value(config_get_string_value(config, "LOG_LEVEL"), config, storage_config);
+    
+    char* log_level_str = config_get_string_value(config, "LOG_LEVEL");
+    if (!log_level_str) {
+        goto cleanup;
+    }
+    storage_config->log_level = log_level_from_string(log_level_str);
 
     config_destroy(config);
     return storage_config;
+
+cleanup:
+    config_destroy(config);
+    destroy_storage_config(storage_config);
+    return NULL;
 }
 
 void destroy_storage_config(t_storage_config *storage_config)
@@ -58,13 +73,12 @@ void destroy_storage_config(t_storage_config *storage_config)
     if (!storage_config)
         return;
 
-    free(storage_config->storage_ip);
     // puerto_escucha es int, no necesita free
     // fresh_start es bool, no necesita free
     free(storage_config->punto_montaje);
     // retardo_operacion es int, no necesita free
     // retardo_acceso_bloque es int, no necesita free
-    free(storage_config->log_level);
+    // log_level es enum, no necesita free
 
     free(storage_config);
 }
@@ -72,7 +86,6 @@ void destroy_storage_config(t_storage_config *storage_config)
 static bool has_required_properties(t_config *config)
 {
     char *required_props[] = {
-        "STORAGE_IP",
         "PUERTO_ESCUCHA",
         "FRESH_START",
         "PUNTO_MONTAJE",
@@ -93,25 +106,3 @@ static bool has_required_properties(t_config *config)
     return true;
 }
 
-static void handle_fatal_error(t_config *config, t_storage_config *storage_config) {
-    fprintf(stderr, "Error fatal, cerrando el programa.\n");
-    config_destroy(config);
-    destroy_storage_config(storage_config);
-    exit(EXIT_FAILURE);
-}
-
-static char *duplicate_config_value(char *value, t_config *config, t_storage_config *storage_config)
-{
-    if (!value)
-    {
-        fprintf(stderr, "Valor de configuración es NULL\n");
-        handle_fatal_error(config, storage_config);
-    }
-    char *duplicate = strdup(value);
-    if (!duplicate)
-    {
-        fprintf(stderr, "strdup falló\n");
-        handle_fatal_error(config, storage_config);
-    }
-    return duplicate;
-}

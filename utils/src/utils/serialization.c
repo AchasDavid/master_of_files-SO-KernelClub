@@ -205,7 +205,7 @@ void package_send(t_package *package, int socket)
     uint32_t serialized_package_size = sizeof(package->operation_code) + sizeof(size_t) + package->buffer->size;
     void *serialized_package = malloc(serialized_package_size);
     if (!serialized_package)
-        return NULL;
+        return;
     int offset = 0;
 
     memcpy(serialized_package + offset, &(package->operation_code), sizeof(uint8_t));

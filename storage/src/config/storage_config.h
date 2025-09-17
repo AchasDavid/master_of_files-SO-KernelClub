@@ -2,6 +2,7 @@
 #define STORAGE_CONFIG_H
 
 #include <commons/config.h>
+#include <commons/log.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -9,13 +10,12 @@
 #include <errno.h>
 
 typedef struct {
-    char* storage_ip;
-    int puerto_escucha;
-    bool fresh_start;
-    char* punto_montaje;
-    int retardo_operacion;
-    int retardo_acceso_bloque;
-    char* log_level;
+    int puerto_escucha;         // Numérico
+    bool fresh_start;           // Booleano  
+    char* punto_montaje;        // String
+    int retardo_operacion;      // Numérico
+    int retardo_acceso_bloque;  // Numérico
+    t_log_level log_level;      // Log level enum
 } t_storage_config;
 
 /**
