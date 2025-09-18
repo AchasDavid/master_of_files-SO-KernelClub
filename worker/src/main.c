@@ -18,6 +18,8 @@ int main(int argc, char *argv[])
     }
 
     char *config_file_path = argv[1];
+    char *worker_id = argv[2];
+
     t_worker_config *worker_config = create_worker_config(config_file_path);
     if (worker_config == NULL)
     {
@@ -36,6 +38,7 @@ int main(int argc, char *argv[])
     log_info(logger, "## Logger inicializado");
 
     int client_socket_master = handshake_with_master(worker_config->master_ip, worker_config->master_port);
+    int result = send_id_to_master(client_socket_master, worker_id);
 
     // int client_socket_storage = client_connect(worker_config->storage_ip, worker_config->storage_port);
     // if (client_socket_storage < 0)
