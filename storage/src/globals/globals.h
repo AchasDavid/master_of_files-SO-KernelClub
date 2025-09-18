@@ -6,15 +6,15 @@
 typedef struct {
     char* storage_ip;
     char* storage_port;
-    char* fresh_start;
+    bool fresh_start;
     char* module_path;
-    char* operation_delay;
-    char* block_access_delay;
-    char* log_level;
+    int operation_delay;
+    int block_access_delay;
+    t_log_level log_level;
 } t_storage_config;
 
 extern t_log* g_storage_logger;
 extern t_storage_config* g_storage_config;
-int g_worker_counter;
+extern int g_worker_counter;
 
 #endif

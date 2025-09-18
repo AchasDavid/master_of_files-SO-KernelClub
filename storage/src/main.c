@@ -16,7 +16,7 @@
 #include "helper/helper.h"
 
 #define MODULE "STORAGE"
-#define DEFAULT_CONFIG_PATH "./src/storage.config"
+#define DEFAULT_CONFIG_PATH "./src/config/storage.config"
 
 t_storage_config* g_storage_config;
 t_log* g_storage_logger;
@@ -43,27 +43,33 @@ int main(int argc, char* argv[]) {
     }
 
     // Crea storage logger como variable global
-    t_log_level log_level = log_level_from_string(g_storage_config->log_level);
-
     char current_directory[PATH_MAX];
     if (getcwd(current_directory, sizeof(current_directory)) == NULL) {
         fprintf(stderr, "Error al obtener el directorio actual\n");
-        goto clean;
+        goto clean_config;
     }
 
-    g_storage_logger = create_logger(current_directory, MODULE, false, log_level);
+    g_storage_logger = create_logger(current_directory, MODULE, false, g_storage_config->log_level);
     if (g_storage_logger == NULL) {
         fprintf(stderr, "No se pudo crear el logger\n");
-        goto clean;
+        goto clean_config;
     }
 
-    log_debug(g_storage_logger, "Logger creado con nivel %s", g_storage_config->log_level);
+    log_debug(g_storage_logger, "Logger creado exitosamente.");
+    log_debug(g_storage_logger,
+              "Configuracion leida: \\n\\tPUERTO_ESCUCHA=%s\\n\\tFRESH_START=%s\\n\\tPUNTO_MONTAJE=%s\\n\\tRETARDO_OPERACION=%d\\n\\tRETARDO_ACCESO_BLOQUE=%d\\n\\tLOG_LEVEL=%s",
+              g_storage_config->storage_port,
+              g_storage_config->fresh_start ? "TRUE" : "FALSE",
+              g_storage_config->module_path,
+              g_storage_config->operation_delay,
+              g_storage_config->block_access_delay,
+              log_level_as_string(g_storage_config->log_level));
 
     // Inicia servidor
     int socket = start_server(g_storage_config->storage_ip, g_storage_config->storage_port);
-    if (socket == -1) {
+    if (socket < 0) {
         log_error(g_storage_logger, "No se pudo iniciar el servidor en %s:%s\n", g_storage_config->storage_ip, g_storage_config->storage_port);
-        goto clean;
+        goto clean_logger;
     }
 
     log_info(g_storage_logger, "Servidor iniciado en %s:%s", g_storage_config->storage_ip, g_storage_config->storage_port);
@@ -71,7 +77,7 @@ int main(int argc, char* argv[]) {
 	while (1) {
         int client_fd = wait_for_client(socket);
         if (client_fd == -1) {
-            goto clean;
+            goto clean_logger;
         }
         
         t_client_data* client_data = malloc(sizeof(t_client_data));
@@ -89,13 +95,17 @@ int main(int argc, char* argv[]) {
         pthread_detach(client_thread);
 	}
 
-    destroy_storage_config(g_storage_config);
+    close(socket);
     log_destroy(g_storage_logger);
+    destroy_storage_config(g_storage_config);
     exit(EXIT_SUCCESS);
 
-clean:
-    destroy_storage_config(g_storage_config);
+clean_logger:
     log_destroy(g_storage_logger);
+
+clean_config:
+        destroy_storage_config(g_storage_config);
+
 error:
     exit(EXIT_FAILURE);
 }
