@@ -1,5 +1,5 @@
-#ifndef STORAGE_FS_H
-#define STORAGE_FS_H
+#ifndef MAIN_H
+#define MAIN_H
 
 #include <commons/log.h>
 
