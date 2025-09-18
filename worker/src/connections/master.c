@@ -17,8 +17,7 @@ int handshake_with_master(const char *master_ip, const char *master_port)
     t_package *request = package_create(OP_WORKER_HANDSHAKE_REQ, buffer);
     if (package_send(request, client_socket_master) < 0) {
         log_error(logger, "## No se pudo enviar el handshake al Master. IP=%s:%s", master_ip, master_port);
-        buffer_destroy(buffer);
-        free(request);
+        package_destroy(request);
         close(client_socket_master);
         return -1;
     }
