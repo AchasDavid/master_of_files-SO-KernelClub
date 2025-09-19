@@ -11,6 +11,6 @@ typedef enum {
     OP_WORKER_HANDSHAKE_RES,
 } t_master_op_code;
 
-// TODO: Operation codes para Storage
+// TODO: Crear t_storage_op_code
 
 #endif
