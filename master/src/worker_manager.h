@@ -1,3 +1,8 @@
+/**
+ * @file worker_manager.h
+ * @brief Definiciones para la gestión de Workers en el Master
+ */
+
 #ifndef WORKER_MANAGER_H
 #define WORKER_MANAGER_H
 
