@@ -37,7 +37,7 @@ typedef struct {
 
     // Mutex para sincronización en cambio de estados
     pthread_mutex_t query_table_mutex;
-} t_query_table
+} t_query_table;
 
 /**
  * @brief Maneja la recepción y el procesamiento de la ruta de archivo de consulta y su prioridad desde un cliente.
