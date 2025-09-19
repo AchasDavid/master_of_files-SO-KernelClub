@@ -31,7 +31,7 @@ void* handle_client(void* arg) {
     
     t_package *response;
     switch (request->operation_code) {
-        case OP_CODE_REQ_HANSHAKE:
+        case OP_CODE_REQ_HANDSHAKE:
             log_info(g_storage_logger, "Cód. op.: %d. Handshake recibido del Worker mediante el socket %d.", request->operation_code, client_socket);
             response = reply_handshake();
 
