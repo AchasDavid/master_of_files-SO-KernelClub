@@ -4,6 +4,9 @@
 #include <utils/serialization.h>
 #include <utils/protocol.h>
 #include <pthread.h>
+#include <commons/log.h>
+
+typedef struct master t_master;
 
 typedef enum {
     QUERY_STATE_NEW,
@@ -23,7 +26,7 @@ typedef struct {
     t_query_state state;
 } t_query_control_block;
 
-typedef struct {
+typedef struct query_table {
     t_query_control_block *query_list; // Lista de t_query_control_block
 
     // Manejo de estados
@@ -37,7 +40,7 @@ typedef struct {
 
     // Mutex para sincronización en cambio de estados
     pthread_mutex_t query_table_mutex;
-} t_query_table
+} t_query_table;
 
 /**
  * @brief Maneja la recepción y el procesamiento de la ruta de archivo de consulta y su prioridad desde un cliente.
@@ -51,6 +54,7 @@ typedef struct {
  * @param logger Pointer al logger para registrar eventos y errores.
  * @return 0 en caso de éxito, negativo en caso de error.
  */
-int manage_query_file_path(t_buffer *required_package,int client_socket, t_log *logger);
+int manage_query_file_path(t_buffer *buffer, int client_socket, t_master *master);
+int generate_query_id(t_master *master);
 
 #endif

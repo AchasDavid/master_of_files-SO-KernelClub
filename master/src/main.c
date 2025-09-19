@@ -1,7 +1,5 @@
 #include <utils/server.h>
 #include <utils/utils.h>
-#include <query_control_manager.h>
-#include <config/master_config.h>
 #include <utils/protocol.h>
 #include <utils/serialization.h>
 #include <commons/config.h>
@@ -11,7 +9,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <stdlib.h> 
+#include <stdlib.h>
+
+#include <init_master.h>
+#include <query_control_manager.h>
+#include <worker_manager.h>
+#include <config/master_config.h>
 
 #define MODULO "MASTER"
 #define LOG_LEVEL LOG_LEVEL_DEBUG //inicialmente DEBUG, luego se setea desde el config
@@ -20,7 +23,7 @@ void* handle_client(void* arg);
 
 typedef struct {
     int client_socket;
-    t_log* logger;
+    t_master *master;
 } t_client_data;
 
 int main(int argc, char* argv[]) {
@@ -64,12 +67,19 @@ int main(int argc, char* argv[]) {
     log_debug(logger, "Configuracion leida: \n\tIP_ESCUCHA=%s\n\tPUERTO_ESCUCHA=%s\n\tALGORITMO_PLANIFICACION=%s\n\tTIEMPO_AGING=%d\n\tLOG_LEVEL=%s",
              master_config->ip, master_config->port, master_config->scheduler_algorithm, master_config->aging_time, log_level_as_string(master_config->log_level));
 
+    // Inicializo la estructura principal del Master (tablas, datos de config, hilos, etc.)
+    t_master *master = init_master(master_config->ip, master_config->port, master_config->aging_time, master_config->scheduler_algorithm, logger);
+    
+    // Destruyo master_config
+    destroy_master_config_instance(master_config);
+    master_config = NULL;
+    
     // Inicio el servidor
-    int server_socket_fd = start_server(master_config->ip, master_config->port);
+    int server_socket_fd = start_server(master->ip, master->port);
 
     if (server_socket_fd < 0) 
     {
-        log_error(logger, "Error al iniciar el servidor en %s:%s", master_config->ip, master_config->port);
+        log_error(logger, "Error al iniciar el servidor en %s:%s", master->ip, master->port);
         goto clean;
     }
 
@@ -96,7 +106,7 @@ int main(int argc, char* argv[]) {
             continue;
         }  
         client_data->client_socket = client_socket_fd;
-        client_data->logger = logger;
+        client_data->master = master;
 
 
         pthread_t client_thread;
@@ -111,8 +121,9 @@ int main(int argc, char* argv[]) {
     }
 
 clean:
-    destroy_master_config_instance(master_config);
-    log_destroy(logger);
+    if (master) destroy_master(master);
+    if (master_config) destroy_master_config_instance(master_config);
+    if (logger) log_destroy(logger);
     return 1;
 error:
     return -1;
@@ -123,37 +134,37 @@ error:
 void* handle_client(void* arg) {
     t_client_data *client_data = (t_client_data*)arg;
     int client_socket = client_data->client_socket;
-    t_log* logger = client_data->logger;    
+    t_master *master = client_data->master;
 
     while (1) {
         t_package *required_package = package_receive(client_socket);
 
         if (required_package == NULL) {
-            log_error(logger, "Error al recibir el paquete del cliente %d, se cierra conexión y libera socket.", client_socket);
+            log_error(master->logger, "Error al recibir el paquete del cliente %d, se cierra conexión y libera socket.", client_socket);
             break; // Sale del bucle y cierra la conexión
         }
 
         switch (required_package->operation_code)
         {
             case OP_QUERY_HANDSHAKE:
-                log_debug(logger, "Recibido OP_QUERY_HANDSHAKE de socket %d", client_socket);
+                log_debug(master->logger, "Recibido OP_QUERY_HANDSHAKE de socket %d", client_socket);
                 {
                     char* response = "1"; // TODO: Generar ID único y secuencial
                     if (send(client_socket, response, strlen(response), 0) == -1) {
-                        log_error(logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
+                        log_error(master->logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
                         break;
                     }
-                    log_info(logger, "Handshake completado con Query Control en socket %d", client_socket);
+                    log_info(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
                 }
                 break;
             case OP_QUERY_FILE_PATH:
-                log_debug(logger, "Recibido OP_QUERY_FILE_PATH de socket %d", client_socket);
-                if (manage_query_file_path(required_package->buffer, client_socket, logger) != 0) {
-                    log_error(logger, "Error al manejar OP_QUERY_FILE_PATH del cliente %d", client_socket);
+                log_debug(master->logger, "Recibido OP_QUERY_FILE_PATH de socket %d", client_socket);
+                if (manage_query_file_path(required_package->buffer, client_socket, master) != 0) {
+                    log_error(master->logger, "Error al manejar OP_QUERY_FILE_PATH del cliente %d", client_socket);
                 }
                 break;
             default:
-                log_warning(logger, "Operacion desconocida recibida del cliente %d", client_socket);
+                log_warning(master->logger, "Operacion desconocida recibida del cliente %d", client_socket);
                 break;
         }
         package_destroy(required_package); // Libera el paquete recibido

@@ -2,6 +2,9 @@
 #define WORKER_MANAGER_H
 
 #include <pthread.h>
+#include <commons/log.h>
+
+typedef struct master t_master;
 
 typedef enum {
     WORKER_STATE_DISCONNECTED,
@@ -17,7 +20,7 @@ typedef struct {
     t_worker_state state;
 } t_worker_control_block;
 
-typedef struct {
+typedef struct worker_table {
     t_worker_control_block *worker_list; // Lista de t_worker_control_block
     int total_workers_connected; // Define el nivel de multiprocesamiento
 
