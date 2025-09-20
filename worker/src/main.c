@@ -38,18 +38,19 @@ int main(int argc, char *argv[])
     t_log *logger = logger_get();
     log_info(logger, "## Logger inicializado");
 
-    int client_socket_master = handshake_with_master(worker_config->master_ip, worker_config->master_port);
+    int client_socket_master =
+        handshake_with_master(worker_config->master_ip,
+                              worker_config->master_port,
+                              worker_id);
     if (client_socket_master < 0)
     {
         goto clean;
     }
-    int result = send_id_to_master(client_socket_master, worker_id);
-    if (result < 0)
-    {
-        goto clean;
-    }
 
-    int client_socket_storage = handshake_with_storage(worker_config->storage_ip, worker_config->storage_port);
+    int client_socket_storage =
+        handshake_with_storage(worker_config->storage_ip,
+                               worker_config->storage_port,
+                               worker_id);
     if (client_socket_storage < 0)
     {
         goto clean;
@@ -57,8 +58,10 @@ int main(int argc, char *argv[])
 
     destroy_worker_config(worker_config);
     logger_destroy();
-    if (client_socket_master >= 0) close(client_socket_master);
-    if (client_socket_storage >= 0) close(client_socket_storage);
+    if (client_socket_master >= 0)
+        close(client_socket_master);
+    if (client_socket_storage >= 0)
+        close(client_socket_storage);
     exit(EXIT_SUCCESS);
 
 clean:

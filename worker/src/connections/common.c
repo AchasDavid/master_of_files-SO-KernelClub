@@ -4,7 +4,8 @@ int handshake_with_server(const char *server_name,
                           const char *ip,
                           const char *port,
                           uint8_t request_op,
-                          uint8_t expected_response_op)
+                          uint8_t expected_response_op,
+                          char *worker_id)
 {
     t_log *logger = logger_get();
     t_package *request = NULL;
@@ -26,7 +27,7 @@ int handshake_with_server(const char *server_name,
         log_error(logger, "## No se pudo crear buffer para %s", server_name);
         goto clean;
     }
-    buffer_write_uint8(buffer, request_op);
+    buffer_write_string(buffer, worker_id);
 
     request = package_create(request_op, buffer);
     if (!request)
