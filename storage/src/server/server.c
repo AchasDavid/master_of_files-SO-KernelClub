@@ -41,7 +41,6 @@ void* handle_client(void* arg) {
 
         if (!response)
         {
-            log_error(g_storage_logger, "Falló la creación del package de respuesta al Worker %d. - Socket: %d", client_data->client_id, client_data->client_socket);
             goto cleanup;
         }
     
@@ -55,5 +54,10 @@ cleanup:
     close(client_socket);
     free(client_data);
     return 0;
+}
+
+void client_data_destroy(t_client_data *client_data) {
+    free(client_data->client_id);
+    free(client_data);
 }
 

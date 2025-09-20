@@ -16,7 +16,7 @@ typedef struct {
 
 typedef struct {
     int client_socket;
-    int client_id;
+    char *client_id;
 } t_client_data;
 
 extern t_log* g_storage_logger;

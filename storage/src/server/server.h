@@ -17,5 +17,6 @@
 
 int wait_for_client(int server_socket);
 void* handle_client(void* arg);
+void client_data_destroy(t_client_data *client_data);
 
 #endif
