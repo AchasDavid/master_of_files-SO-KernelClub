@@ -21,6 +21,9 @@ t_storage_config* g_storage_config;
 t_log* g_storage_logger;
 int g_worker_counter = 0;
 
+// semáforos
+pthread_mutex_t g_worker_counter_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 int main(int argc, char* argv[]) {
     // Obtiene posibles parametros de entrada
     char config_file_path[PATH_MAX];
@@ -86,12 +89,16 @@ int main(int argc, char* argv[]) {
         }
         
         t_client_data* client_data = malloc(sizeof(t_client_data));
+        if (client_data == NULL) {
+            log_error(g_storage_logger, "Error al asignar memoria para los datos del cliente %d. Se cierra la conexión.", client_fd);
+            close(client_fd);
+            continue;
+        }
         client_data->client_socket = client_fd;
-        //client_data->logger = logger;
 
         pthread_t client_thread;
-        if (pthread_create(&client_thread, NULL, handle_client, client_data) != 0) {
-            log_error(g_storage_logger, "Error al crear hilo para cliente %d", client_fd);
+        if (pthread_create(&client_thread, NULL, handle_client, (void*)client_data) != 0) {
+            log_error(g_storage_logger, "Error al crear hilo para cliente %d. Se cierra la conexión.", client_fd);
             close(client_fd);
             free(client_data);
             continue;

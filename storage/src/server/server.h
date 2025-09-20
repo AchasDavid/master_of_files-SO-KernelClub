@@ -10,15 +10,10 @@
 #include<commons/collections/list.h>
 #include<string.h>
 #include<assert.h>
+#include "utils/protocol.h"
 #include "globals/globals.h"
 #include "utils/serialization.h"
-#include "operations/operations.h"
 #include "operations/handshake.h"
-
-typedef struct {
-    int client_socket;
-    //t_log* logger;
-} t_client_data;
 
 int wait_for_client(int server_socket);
 void* handle_client(void* arg);
