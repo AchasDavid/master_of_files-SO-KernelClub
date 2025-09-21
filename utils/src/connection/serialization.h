@@ -40,7 +40,7 @@ void buffer_reset_offset(t_buffer *buffer);
 bool buffer_write_uint8(t_buffer *buffer, uint8_t value);
 bool buffer_write_uint16(t_buffer *buffer, uint16_t value);
 bool buffer_write_uint32(t_buffer *buffer, uint32_t value);
-bool buffer_write_string(t_buffer *buffer, const char *value);
+bool buffer_write_string(t_buffer *buffer, char *value);
 bool buffer_write_data(t_buffer *buffer, const void *data, size_t data_size);
 
 // Funciones de lectura

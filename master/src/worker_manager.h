@@ -8,8 +8,8 @@
 
 #include <pthread.h>
 #include <commons/log.h>
-#include <utils/src/connection/serialization.h>
-#include <utils/src/connection/protocol.h>
+#include <connection/serialization.h>
+#include <connection/protocol.h>
 
 typedef struct master t_master;
 

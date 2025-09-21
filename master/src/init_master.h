@@ -15,6 +15,7 @@
 #define INIT_MASTER_H
 
 #include <pthread.h>
+#include <commons/log.h>
 
 // Forward declarations (para evitar inclusiones circulares)
 // Se utilizan punteros a estas estructuras en t_master

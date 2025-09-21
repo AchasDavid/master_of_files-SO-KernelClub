@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 t_buffer *buffer_create(size_t size){
     if (size == 0) 
@@ -159,32 +160,37 @@ bool buffer_write_uint16(t_buffer *buffer, uint16_t value)
     buffer->offset += sizeof(uint16_t);
 }
 
+
 bool buffer_write_uint32(t_buffer *buffer, uint32_t value)
 {
-    if (!buffer_has_capacity(buffer, sizeof(uint32_t))) 
-    {
+    if (!buffer_has_capacity(buffer, sizeof(uint32_t))) {
         return false;
     }
 
     // Convertir a network byte order (big-endian)
     uint32_t net_value = htonl(value);
     uint8_t *next_position = (uint8_t *)buffer->stream + buffer->offset;
-
     memcpy(next_position, &net_value, sizeof(uint32_t));
     buffer->offset += sizeof(uint32_t);
+    
+    return true;
 }
 
 bool buffer_write_string(t_buffer *buffer, char *value)
 {
-    if (!buffer || !value) 
-    {
+    if (!buffer || !value) {
         return false;
     }
-    uint32_t str_length = string_length(value);
-    size_t size_msg = sizeof(uint32_t) + str_length;
 
-    if (!buffer_has_capacity(buffer, size_msg)) 
-    {
+    uint32_t str_length = strlen(value);
+    size_t total_size = sizeof(uint32_t) + str_length;
+    
+    if (!buffer_has_capacity(buffer, total_size)) {
+        return false;
+    }
+
+    // Escribir longitud en network byte order
+    if (!buffer_write_uint32(buffer, str_length)) {
         return false;
     }
 

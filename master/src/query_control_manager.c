@@ -1,53 +1,58 @@
-#include "query_control_manager.h"
-#include "utils/src/connection/protocol.h"
-#include "utils/src/connection/serialization.h"
 #include "init_master.h"
+#include "query_control_manager.h"
+#include "connection/protocol.h"
+#include "connection/serialization.h"
 #include "commons/log.h"
 
-int manage_query_handshake(t_buffer *buffer, int client_socket, t_log *logger) {
-    char* response = "OP_QUERY_HANDSHAKE";
-    if (send(client_socket, response, strlen(response), 0) == -1) 
+int manage_query_handshake(int client_socket, t_log *logger) {
+    t_package *response_package = package_create_empty(OP_QUERY_HANDSHAKE);
+    if (!response_package)
     {
-        log_error(logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
+        log_error(logger, "Error al crear package...");
         return -1;
+    }
+    if (package_send(response_package, client_socket) < 0) // --> package_create_empty se encarga de no cargar NULL
+    {
+        return -2;
     }
     return 0;
 }
 
-int manage_query_file_path(t_buffer *buffer, int client_socket, t_master *master) {
+int manage_query_file_path(t_package *response_package, int client_socket, t_master *master) {
     // Extraer path del query y prioridad del paquete
-    buffer_reset_offset(buffer);
-    char* data = buffer_read_string(buffer);
-    if (data == NULL) {
-        return -1;
-    }
-
-    char* delimiter_position = strchr(data, 0x1F); // 0x1F es el delimitador
-    if (delimiter_position == NULL) {
-        free(data);
-        return -1;
-    }
-
-    *delimiter_position = '\0'; // Reemplazo el delimitador por un null terminator
-    char* query_file_path = data;
-    int priority = atoi(delimiter_position + 1);
-
-    // Enviar OK como respuesta
-    char* response = "PATH_RECEIVED_OK";
-    if (send(client_socket, response, strlen(response), 0) == -1) 
+    if (!response_package)
     {
-        log_error(master->logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
         return -1;
     }
+    char *query_path = package_read_string(response_package);
 
-    // Loggear la información recibida
+    uint8_t query_priority;
+    package_read_uint8(response_package, &query_priority);
+
     int assigned_id = generate_query_id(master);
     int multiprocessing_level = master->multiprogramming_level; // TODO: Asignar el nivel real cuando esté implementado
-    log_info(master->logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_file_path, priority, assigned_id, multiprocessing_level);
+    
+    // Responder a QC
+    t_package *query_path_package = package_create_empty(OP_QUERY_FILE_PATH);
+
+    if (!query_path_package)
+    {
+        goto disconnect;
+    }
+
+    package_send(query_path_package, client_socket);
+
+    // Loggear la información recibida
+    log_info(master->logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_path, query_priority, assigned_id, multiprocessing_level);
+    
     // TODO: agregar la lógica para manejar la ejecución del query
 
-    free(data);
+    package_destroy(query_path_package);
     return 0;
+disconnect:
+// TODO: manejar desconexion de QC
+log_error(master->logger, "Error al enviar respuesta a Query Control, se desconectará...");
+return -1;
 
 }
 

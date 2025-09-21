@@ -1,9 +1,5 @@
 #include <utils/server.h>
 #include <utils/utils.h>
-#include <query_control_manager.h>
-#include <config/master_config.h>
-#include <utils/src/connection/protocol.h>
-#include <utils/src/connection/serialization.h>
 #include <commons/config.h>
 #include <commons/log.h>
 #include <linux/limits.h>
@@ -14,6 +10,8 @@
 #include <stdlib.h>
 
 #include <init_master.h>
+#include <connection/protocol.h>
+#include <connection/serialization.h>
 #include <query_control_manager.h>
 #include <worker_manager.h>
 #include <config/master_config.h>
@@ -150,13 +148,13 @@ void* handle_client(void* arg) {
         {
             case OP_QUERY_HANDSHAKE:
                 log_debug(master->logger, "Recibido OP_QUERY_HANDSHAKE de socket %d", client_socket);
-                if (manage_query_handshake(required_package->buffer, client_socket, master->logger) == 0) {
+                if (manage_query_handshake(client_socket, master->logger) == 0) {
                     log_info(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
-                }              
+                }       
                 break;
             case OP_QUERY_FILE_PATH:
                 log_debug(master->logger, "Recibido OP_QUERY_FILE_PATH de socket %d", client_socket);
-                if (manage_query_file_path(required_package->buffer, client_socket, master) != 0) {
+                if (manage_query_file_path(required_package, client_socket, master) != 0) {
                     log_error(master->logger, "Error al manejar OP_QUERY_FILE_PATH del cliente %d", client_socket);
                 }
                 break;
