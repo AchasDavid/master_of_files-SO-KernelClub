@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
 
     // TODO: Manejar la respuesta
 
-    //package_destroy(pkg);
+    package_destroy(package_to_send);
     package_destroy(response_package);
 
 clean_socket:

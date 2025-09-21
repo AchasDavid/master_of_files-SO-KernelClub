@@ -48,6 +48,7 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     // TODO: agregar la lógica para manejar la ejecución del query
 
     package_destroy(query_path_package);
+    free(query_path);
     return 0;
 disconnect:
 // TODO: manejar desconexion de QC
