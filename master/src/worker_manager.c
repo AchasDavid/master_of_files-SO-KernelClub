@@ -1,6 +1,6 @@
 #include "worker_manager.h"
-#include "utils/protocol.h"
-#include "utils/serialization.h"
+#include "utils/src/connection/protocol.h"
+#include "utils/src/connection/serialization.h"
 #include <init_master.h>
 
 int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *master) {

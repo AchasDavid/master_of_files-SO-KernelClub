@@ -1,6 +1,7 @@
 #include "query_control_manager.h"
-#include "utils/connection/protocol.h"
-#include "utils/connection/serialization.h"
+#include "utils/src/connection/protocol.h"
+#include "utils/src/connection/serialization.h"
+#include "init_master.h"
 #include "commons/log.h"
 
 int manage_query_handshake(t_buffer *buffer, int client_socket, t_log *logger) {

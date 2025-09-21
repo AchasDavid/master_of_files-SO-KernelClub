@@ -2,8 +2,8 @@
 #include <utils/utils.h>
 #include <query_control_manager.h>
 #include <config/master_config.h>
-#include <utils/connection/protocol.h>
-#include <utils/connection/serialization.h>
+#include <utils/src/connection/protocol.h>
+#include <utils/src/connection/serialization.h>
 #include <commons/config.h>
 #include <commons/log.h>
 #include <linux/limits.h>
