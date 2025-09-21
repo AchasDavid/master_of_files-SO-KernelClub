@@ -4,8 +4,7 @@
 #include "commons/log.h"
 
 int manage_query_handshake(t_buffer *buffer, int client_socket, t_log *logger) {
-    // Enviar ID asignado al Query Control (hardcodeado por ahora)
-    char* response = "1"; // TODO: Generar ID único y secuencial
+    char* response = "OP_QUERY_HANDSHAKE";
     if (send(client_socket, response, strlen(response), 0) == -1) 
     {
         log_error(logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
@@ -14,7 +13,7 @@ int manage_query_handshake(t_buffer *buffer, int client_socket, t_log *logger) {
     return 0;
 }
 
-int manage_query_file_path(t_buffer *buffer, int client_socket, t_log *logger) {
+int manage_query_file_path(t_buffer *buffer, int client_socket, t_master *master) {
     // Extraer path del query y prioridad del paquete
     buffer_reset_offset(buffer);
     char* data = buffer_read_string(buffer);
@@ -36,17 +35,21 @@ int manage_query_file_path(t_buffer *buffer, int client_socket, t_log *logger) {
     char* response = "PATH_RECEIVED_OK";
     if (send(client_socket, response, strlen(response), 0) == -1) 
     {
-        log_error(logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
+        log_error(master->logger, "Error al enviar respuesta de handshake al Query Control %d", client_socket);
         return -1;
     }
 
     // Loggear la información recibida
-    int assigned_id = 2; // TODO: Asignar el ID real cuando esté implementado
-    int multiprocessing_level = 1; // TODO: Asignar el nivel real cuando esté implementado
-    log_info(logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_file_path, priority, assigned_id, multiprocessing_level);
+    int assigned_id = generate_query_id(master);
+    int multiprocessing_level = master->multiprogramming_level; // TODO: Asignar el nivel real cuando esté implementado
+    log_info(master->logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_file_path, priority, assigned_id, multiprocessing_level);
     // TODO: agregar la lógica para manejar la ejecución del query
 
     free(data);
     return 0;
 
+}
+
+int generate_query_id(t_master *master) {
+    return ++(master->queries_table->next_query_id);
 }

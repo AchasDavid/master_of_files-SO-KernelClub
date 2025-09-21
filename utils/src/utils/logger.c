@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 static t_log *global_logger = NULL;
 
