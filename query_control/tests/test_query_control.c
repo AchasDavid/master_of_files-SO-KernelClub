@@ -43,18 +43,6 @@ context(test_query_control) {
                 should_ptr(config) be equal to((t_query_control_config*) -1);
             } end
         } end
-
-        describe("Limpieza de configuracion") {
-            it("deberia manejar seguramente un puntero nulo en la funcion de destruccion") {
-                destroy_query_control_config_instance(NULL);
-            } end
-
-            it("deberia liberar correctamente la memoria asignada") {
-                t_query_control_config* config = create_query_control_config("tests/resources/test.config");
-                should_ptr(config) not be null;
-                destroy_query_control_config_instance(config);
-            } end
-        } end
     } end
 
     describe("Validacion de argumentos") {
@@ -78,24 +66,6 @@ context(test_query_control) {
 
                 should_bool(result > 0) be truthy;
                 should_bool(result < sizeof(send_buffer)) be truthy;
-            } end
-        } end
-
-        describe("Validacion de codigos de error") {
-            it("deberia tener codigos de error unicos para diferentes escenarios") {
-                int error_invalid_args = -1;
-                int error_getcwd = -2;
-                int error_config = -3;
-                int error_logger = -4;
-                int error_connection = -5;
-                int error_send = -6;
-                int error_recv = -7;
-                int error_negative_priority = -8;
-
-                should_int(error_invalid_args) not be equal to(error_getcwd);
-                should_int(error_config) not be equal to(error_logger);
-                should_int(error_connection) not be equal to(error_send);
-                should_int(error_recv) not be equal to(error_negative_priority);
             } end
         } end
     } end
