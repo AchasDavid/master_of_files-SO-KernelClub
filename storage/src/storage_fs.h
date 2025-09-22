@@ -4,31 +4,35 @@
 #include <commons/log.h>
 
 /**
- * Borra todo el contenido del directorio de montaje del filesystem
+ * Borra todo el contenido del directorio de montaje excepto superblock.config
  * 
  * @param mount_point Ruta del directorio donde está montado el filesystem
  * @param logger Logger para loggear errores y operaciones
  * @return 0 en caso de exito, -1 si se rompe
  */
-int wipe_storage_dir(const char* mount_point, t_log* logger);
+int wipe_storage_content(const char* mount_point, t_log* logger);
 
 /**
- * Arma el archivo superblock.config con toda la config del filesystem
+ * Lee el archivo superblock.config y obtiene la configuración del filesystem
  * 
  * @param mount_point Ruta del directorio donde está montado el filesystem
+ * @param fs_size Puntero donde se almacenará el tamaño del filesystem
+ * @param block_size Puntero donde se almacenará el tamaño de los bloques
  * @param logger Logger para loggear errores y operaciones
- * @return 0 en caso de exito, -1 si se rompe
+ * @return 0 en caso de exito, -1 si no puede abrir el archivo, -2 si faltan propiedades
  */
-int init_superblock(const char* mount_point, t_log* logger);
+int read_superblock(const char* mount_point, int* fs_size, int* block_size, t_log* logger);
 
 /**
  * Crea el bitmap que dice qué bloques están libres o ocupados
  * 
  * @param mount_point Ruta del directorio donde está montado el filesystem
+ * @param fs_size Tamaño total del filesystem
+ * @param block_size Tamaño de cada bloque
  * @param logger Logger para loggear errores y operaciones
  * @return 0 en caso de exito, -1 si no puede abrir el archivo, -2 si no hay memoria
  */
-int init_bitmap(const char* mount_point, t_log* logger);
+int init_bitmap(const char* mount_point, int fs_size, int block_size, t_log* logger);
 
 /**
  * Arma el archivo de hashes de bloques para no tener bloques duplicados
@@ -43,10 +47,12 @@ int init_blocks_index(const char* mount_point, t_log* logger);
  * Crea el directorio de bloques físicos y todos los archivos de bloques
  * 
  * @param mount_point Ruta del directorio donde está montado el filesystem
+ * @param fs_size Tamaño total del filesystem
+ * @param block_size Tamaño de cada bloque
  * @param logger Logger para loggear errores y operaciones
  * @return 0 en caso de exito, -1 si no puede crear el directorio, -2 si fallan los bloques, -3 si no hay memoria
  */
-int init_physical_blocks(const char* mount_point, t_log* logger);
+int init_physical_blocks(const char* mount_point, int fs_size, int block_size, t_log* logger);
 
 /**
  * Arma toda la estructura de archivos con el archivo inicial y sus metadatos

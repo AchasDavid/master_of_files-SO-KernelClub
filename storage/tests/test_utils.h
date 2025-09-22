@@ -102,4 +102,12 @@ int verify_file_size(const char* file_path, size_t expected_size);
  */
 int files_are_hardlinked(const char* file1_path, const char* file2_path);
 
+/**
+ * Crea un archivo superblock.config de prueba con valores predeterminados
+ * 
+ * @param mount_point Path donde crear el superblock
+ * @return 0 en caso de exito, -1 si falla
+ */
+int create_test_superblock(const char* mount_point);
+
 #endif

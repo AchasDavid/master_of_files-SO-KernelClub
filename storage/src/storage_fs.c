@@ -9,17 +9,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define CONST_FS_SIZE 4096
-#define CONST_BLOCK_SIZE 128
 
 /**
- * Borra todo el contenido del directorio de montaje del filesystem
+ * Borra todo el contenido del directorio de montaje excepto superblock.config
  * 
  * @param mount_point Ruta del directorio donde está montado el filesystem
  * @param logger Logger para loggear errores y operaciones
  * @return 0 en caso de exito, -1 si se rompe
  */
-int wipe_storage_dir(const char* mount_point, t_log* logger) {
+int wipe_storage_content(const char* mount_point, t_log* logger) {
     // First check if directory exists
     struct stat st;
     if (stat(mount_point, &st) != 0 || !S_ISDIR(st.st_mode)) {
@@ -27,39 +25,50 @@ int wipe_storage_dir(const char* mount_point, t_log* logger) {
         return -1;
     }
 
-    char command[PATH_MAX + 10];
-    snprintf(command, sizeof(command), "rm -rf %s/*", mount_point);
+    // Comando que borra todo excepto superblock.config
+    char command[PATH_MAX + 50];
+    snprintf(command, sizeof(command), "find %s -mindepth 1 ! -name 'superblock.config' -delete", mount_point);
 
     if (system(command) != 0) {
-        log_error(logger, "No se pudo limpiar el directorio %s", mount_point);
+        log_error(logger, "No se pudo limpiar el contenido del directorio %s", mount_point);
         return -1;
     }
 
-    log_info(logger, "Directorio %s limpiado exitosamente", mount_point);
+    log_info(logger, "Contenido del directorio %s limpiado (preservando superblock.config)", mount_point);
     return 0;
 }
 
 /**
- * Arma el archivo superblock.config con toda la config del filesystem
+ * Lee el archivo superblock.config y obtiene la configuración del filesystem
  * 
  * @param mount_point Ruta del directorio donde está montado el filesystem
+ * @param fs_size Puntero donde se almacenará el tamaño del filesystem
+ * @param block_size Puntero donde se almacenará el tamaño de los bloques
  * @param logger Logger para loggear errores y operaciones
- * @return 0 en caso de exito, -1 si se rompe
+ * @return 0 en caso de exito, -1 si no puede abrir el archivo, -2 si faltan propiedades
  */
-int init_superblock(const char* mount_point, t_log* logger) {
+int read_superblock(const char* mount_point, int* fs_size, int* block_size, t_log* logger) {
     char superblock_path[PATH_MAX];
     snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config", mount_point);
 
-    FILE* superblock_ptr = fopen(superblock_path, "w");
-    if (superblock_ptr == NULL) {
-        log_error(logger, "No se pudo abrir %s para escritura", superblock_path);
+    t_config* config = config_create(superblock_path);
+    if (config == NULL) {
+        log_error(logger, "No se pudo abrir el archivo %s", superblock_path);
         return -1;
     }
 
-    fprintf(superblock_ptr, "FS_SIZE=%d\nBLOCK_SIZE=%d\n", CONST_FS_SIZE, CONST_BLOCK_SIZE);
-    fclose(superblock_ptr);
+    if (!config_has_property(config, "FS_SIZE") || !config_has_property(config, "BLOCK_SIZE")) {
+        log_error(logger, "El superblock no tiene las propiedades requeridas (FS_SIZE, BLOCK_SIZE)");
+        config_destroy(config);
+        return -2;
+    }
 
-    log_info(logger, "Superblock creado en %s", superblock_path);
+    *fs_size = config_get_int_value(config, "FS_SIZE");
+    *block_size = config_get_int_value(config, "BLOCK_SIZE");
+
+    config_destroy(config);
+
+    log_info(logger, "Superblock leído: FS_SIZE=%d, BLOCK_SIZE=%d", *fs_size, *block_size);
     return 0;
 }
 
@@ -67,10 +76,12 @@ int init_superblock(const char* mount_point, t_log* logger) {
  * Crea el bitmap que dice qué bloques están libres o ocupados
  * 
  * @param mount_point Ruta del directorio donde está montado el filesystem
+ * @param fs_size Tamaño total del filesystem
+ * @param block_size Tamaño de cada bloque
  * @param logger Logger para loggear errores y operaciones
  * @return 0 en caso de exito, -1 si no puede abrir el archivo, -2 si no hay memoria
  */
-int init_bitmap(const char* mount_point, t_log* logger) {
+int init_bitmap(const char* mount_point, int fs_size, int block_size, t_log* logger) {
     int retval = 0;
 
     // Checkear si el mount point existe
@@ -83,7 +94,7 @@ int init_bitmap(const char* mount_point, t_log* logger) {
     char bitmap_path[PATH_MAX];
     snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin", mount_point);
 
-    int total_blocks = CONST_FS_SIZE / CONST_BLOCK_SIZE;
+    int total_blocks = fs_size / block_size;
     size_t bitmap_size_bytes = (total_blocks + 7) / 8; // Redondear al próximo byte
 
     // Setear todo el buffer a cero (todos los bloques libres)
@@ -149,10 +160,12 @@ int init_blocks_index(const char* mount_point, t_log* logger) {
  * Crea el directorio de bloques físicos y todos los archivos de bloques
  * 
  * @param mount_point Ruta del directorio donde está montado el filesystem
+ * @param fs_size Tamaño total del filesystem
+ * @param block_size Tamaño de cada bloque
  * @param logger Logger para loggear errores y operaciones
  * @return 0 en caso de exito, -1 si no puede crear el directorio, -2 si fallan los bloques, -3 si no hay memoria
  */
-int init_physical_blocks(const char* mount_point, t_log* logger) {
+int init_physical_blocks(const char* mount_point, int fs_size, int block_size, t_log* logger) {
     char physical_blocks_dir_path[PATH_MAX];
     snprintf(physical_blocks_dir_path, sizeof(physical_blocks_dir_path), "%s/physical_blocks", mount_point);
 
@@ -161,9 +174,9 @@ int init_physical_blocks(const char* mount_point, t_log* logger) {
         return -1;
     }
 
-    int total_blocks = CONST_FS_SIZE / CONST_BLOCK_SIZE;
+    int total_blocks = fs_size / block_size;
     char new_block_path[PATH_MAX];
-    void* zero_buffer = calloc(1, CONST_BLOCK_SIZE);
+    void* zero_buffer = calloc(1, block_size);
     if (zero_buffer == NULL) {
         log_error(logger, "No se pudo asignar memoria para los bloques");
         return -3;
@@ -183,7 +196,7 @@ int init_physical_blocks(const char* mount_point, t_log* logger) {
             return -2;
         }
 
-        fwrite(zero_buffer, 1, CONST_BLOCK_SIZE, block_ptr);
+        fwrite(zero_buffer, 1, block_size, block_ptr);
 
         fclose(block_ptr);
     }
@@ -260,11 +273,13 @@ int init_files(const char* mount_point, t_log* logger) {
  * @return 0 en caso de exito, números negativos (-1 a -6) que te dicen qué función se rompió
  */
 int init_storage(const char* mount_point, t_log* logger) {
-    if (wipe_storage_dir(mount_point, logger) != 0) return -1;
-    if (init_superblock(mount_point, logger) != 0) return -2;
-    if (init_bitmap(mount_point, logger) != 0) return -3;
+    int fs_size, block_size;
+    
+    if (read_superblock(mount_point, &fs_size, &block_size, logger) != 0) return -1;
+    if (wipe_storage_content(mount_point, logger) != 0) return -2;
+    if (init_bitmap(mount_point, fs_size, block_size, logger) != 0) return -3;
     if (init_blocks_index(mount_point, logger) != 0) return -4;
-    if (init_physical_blocks(mount_point, logger) != 0) return -5;
+    if (init_physical_blocks(mount_point, fs_size, block_size, logger) != 0) return -5;
     if (init_files(mount_point, logger) != 0) return -6;
 
     return 0;

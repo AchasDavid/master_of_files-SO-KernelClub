@@ -23,15 +23,18 @@ context(test_storage_filesystem) {
             cleanup_test_directory();
         } end
 
-        describe("funcion wipe_storage_dir") {
+        describe("funcion wipe_storage_content") {
             it("limpia exitosamente un directorio vacio") {
-                int result = wipe_storage_dir(TEST_MOUNT_POINT, test_logger);
+                int result = wipe_storage_content(TEST_MOUNT_POINT, test_logger);
 
                 should_int(result) be equal to(0);
                 should_bool(is_directory_empty(TEST_MOUNT_POINT)) be truthy;
             } end
 
-            it("limpia un directorio con archivos") {
+            it("limpia un directorio con archivos pero preserva superblock.config") {
+                // Crear superblock.config
+                create_test_superblock(TEST_MOUNT_POINT);
+                
                 // Crear algunos archivos de prueba
                 char test_file_path[PATH_MAX];
                 snprintf(test_file_path, sizeof(test_file_path), "%s/test_file.txt", TEST_MOUNT_POINT);
@@ -39,47 +42,60 @@ context(test_storage_filesystem) {
                 fprintf(test_file, "test");
                 fclose(test_file);
 
-                int result = wipe_storage_dir(TEST_MOUNT_POINT, test_logger);
+                char superblock_path[PATH_MAX];
+                snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config", TEST_MOUNT_POINT);
+
+                int result = wipe_storage_content(TEST_MOUNT_POINT, test_logger);
 
                 should_int(result) be equal to(0);
-                should_bool(is_directory_empty(TEST_MOUNT_POINT)) be truthy;
                 should_bool(file_exists(test_file_path)) be falsey;
+                should_bool(file_exists(superblock_path)) be truthy;
             } end
 
             it("retorna error para directorio inexistente") {
-                int result = wipe_storage_dir("/non/existent/path", test_logger);
+                int result = wipe_storage_content("/non/existent/path", test_logger);
 
                 should_int(result) be equal to(-1);
             } end
         } end
 
-        describe("funcion init_superblock") {
-            it("crea superblock.config con contenido correcto") {
-                int result = init_superblock(TEST_MOUNT_POINT, test_logger);
+        describe("funcion read_superblock") {
+            it("lee superblock.config con contenido correcto") {
+                create_test_superblock(TEST_MOUNT_POINT);
+                
+                int fs_size, block_size;
+                int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size, test_logger);
 
                 should_int(result) be equal to(0);
-
-                char superblock_path[PATH_MAX];
-                snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config", TEST_MOUNT_POINT);
-
-                should_bool(file_exists(superblock_path)) be truthy;
-
-                char content[256];
-                read_file_contents(superblock_path, content, sizeof(content));
-                should_ptr(strstr(content, "FS_SIZE=4096")) not be null;
-                should_ptr(strstr(content, "BLOCK_SIZE=128")) not be null;
+                should_int(fs_size) be equal to(TEST_FS_SIZE);
+                should_int(block_size) be equal to(TEST_BLOCK_SIZE);
             } end
 
-            it("retorna error para punto de montaje invalido") {
-                int result = init_superblock("/invalid/path", test_logger);
+            it("retorna error para archivo inexistente") {
+                int fs_size, block_size;
+                int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size, test_logger);
 
                 should_int(result) be equal to(-1);
+            } end
+
+            it("retorna error para archivo malformado") {
+                char superblock_path[PATH_MAX];
+                snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config", TEST_MOUNT_POINT);
+                
+                FILE* superblock_file = fopen(superblock_path, "w");
+                fprintf(superblock_file, "INVALID_CONTENT=123\n");
+                fclose(superblock_file);
+
+                int fs_size, block_size;
+                int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size, test_logger);
+
+                should_int(result) be equal to(-2);
             } end
         } end
 
         describe("funcion init_bitmap") {
             it("crea bitmap.bin con inicializacion correcta") {
-                int result = init_bitmap(TEST_MOUNT_POINT, test_logger);
+                int result = init_bitmap(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
 
                 should_int(result) be equal to(0);
 
@@ -118,7 +134,7 @@ context(test_storage_filesystem) {
             } end
 
             it("retorna error para punto de montaje invalido") {
-                int result = init_bitmap("/invalid/path", test_logger);
+                int result = init_bitmap("/invalid/path", TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
 
                 should_int(result) be equal to(-1);
             } end
@@ -145,7 +161,7 @@ context(test_storage_filesystem) {
 
         describe("funcion init_physical_blocks") {
             it("crea directorio physical_blocks con todos los archivos de bloques") {
-                int result = init_physical_blocks(TEST_MOUNT_POINT, test_logger);
+                int result = init_physical_blocks(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
 
                 should_int(result) be equal to(0);
 
@@ -169,7 +185,7 @@ context(test_storage_filesystem) {
             } end
 
             it("retorna error para punto de montaje invalido") {
-                int result = init_physical_blocks("/invalid/path", test_logger);
+                int result = init_physical_blocks("/invalid/path", TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
 
                 should_int(result) be equal to(-1);
             } end
@@ -177,7 +193,7 @@ context(test_storage_filesystem) {
 
         describe("funcion init_files") {
             it("crea estructura completa de archivos con hard links") {
-                init_physical_blocks(TEST_MOUNT_POINT, test_logger);
+                init_physical_blocks(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
 
                 int result = init_files(TEST_MOUNT_POINT, test_logger);
 

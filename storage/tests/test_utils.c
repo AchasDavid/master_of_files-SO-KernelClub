@@ -101,3 +101,18 @@ int files_are_hardlinked(const char* file1_path, const char* file2_path) {
 
     return (st1.st_ino == st2.st_ino && st1.st_dev == st2.st_dev) ? 1 : 0;
 }
+
+int create_test_superblock(const char* mount_point) {
+    char superblock_path[PATH_MAX];
+    snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config", mount_point);
+
+    FILE* superblock_file = fopen(superblock_path, "w");
+    if (superblock_file == NULL) {
+        return -1;
+    }
+
+    fprintf(superblock_file, "FS_SIZE=%d\nBLOCK_SIZE=%d\n", TEST_FS_SIZE, TEST_BLOCK_SIZE);
+    fclose(superblock_file);
+
+    return 0;
+}
