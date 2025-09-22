@@ -90,7 +90,7 @@ context(test_storage_filesystem) {
 
                 // Verificar contenido del bitmap
                 int total_blocks = TEST_FS_SIZE / TEST_BLOCK_SIZE;
-                size_t bitmap_size_bytes = total_blocks / 8;
+                size_t bitmap_size_bytes = (total_blocks + 7) / 8; // Redondear al próximo byte
 
                 // Leer archivo bitmap en memoria
                 FILE* bitmap_file = fopen(bitmap_path, "rb");
@@ -106,7 +106,7 @@ context(test_storage_filesystem) {
                 t_bitarray* bitmap = bitarray_create_with_mode(bitmap_data, bitmap_size_bytes, MSB_FIRST);
                 should_ptr(bitmap) not be null;
 
-                // El primer bloque debe estar ocupado
+                // El primer bloque debe estar ocupado (para initial_file:BASE)
                 should_bool(bitarray_test_bit(bitmap, 0)) be truthy;
 
                 // Otros bloques deben estar libres
