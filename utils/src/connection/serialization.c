@@ -62,11 +62,11 @@ t_buffer *buffer_create_dynamic(void)
     return new_buffer;
 }
 
-int buffer_expand(t_buffer *buffer, size_t required_size)
+bool buffer_expand(t_buffer *buffer, size_t required_size)
 {
     if (!buffer || !buffer->is_dynamic) 
     {
-        return -1;
+        return false;
     }
 
     size_t new_size = buffer->size;
@@ -77,13 +77,13 @@ int buffer_expand(t_buffer *buffer, size_t required_size)
 
     if (new_size > MAX_BUFFER_SIZE) 
     {
-        return -2;
+        return false;
     }
 
     void *new_stream = realloc(buffer->stream, new_size);
     if (!new_stream) 
     {
-        return -3;
+        return false;
     }
 
     // Inicializar nueva área con zeros
@@ -92,7 +92,7 @@ int buffer_expand(t_buffer *buffer, size_t required_size)
     buffer->stream = new_stream;
     buffer->size = new_size;
     
-    return 0;
+    return true;
 }
 
 void buffer_destroy(t_buffer *buffer)
@@ -117,7 +117,7 @@ void buffer_reset_offset(t_buffer *buffer)
     buffer->offset = 0;
 }
 
-// Función helper para validar capacidad
+// Función helper para validar capacidad y expandir si es dinamico
 static bool buffer_has_capacity(t_buffer *buffer, size_t required_size)
 {
     if (!buffer || !buffer->stream) 
@@ -133,6 +133,15 @@ static bool buffer_has_capacity(t_buffer *buffer, size_t required_size)
     return (buffer->size - buffer->offset) >= required_size;
 }
 
+// Función para verificar capacidad (sólo funciones de lectura)
+static bool buffer_check_capacity(t_buffer *buffer, size_t required_size)
+{
+    if (!buffer || !buffer->stream) {
+        return false;
+    }
+    return (buffer->size - buffer->offset) >= required_size;
+}
+
 bool buffer_write_uint8(t_buffer *buffer, uint8_t value)
 {
     if (!buffer_has_capacity(buffer, sizeof(uint8_t))) 
@@ -143,6 +152,8 @@ bool buffer_write_uint8(t_buffer *buffer, uint8_t value)
 
     memcpy(next_position, &value, sizeof(uint8_t));
     buffer->offset += sizeof(uint8_t);
+
+    return true;
 }
 
 bool buffer_write_uint16(t_buffer *buffer, uint16_t value)
@@ -158,6 +169,8 @@ bool buffer_write_uint16(t_buffer *buffer, uint16_t value)
 
     memcpy(next_position, &net_value, sizeof(uint16_t));
     buffer->offset += sizeof(uint16_t);
+
+    return true;
 }
 
 
@@ -176,7 +189,7 @@ bool buffer_write_uint32(t_buffer *buffer, uint32_t value)
     return true;
 }
 
-bool buffer_write_string(t_buffer *buffer, char *value)
+bool buffer_write_string(t_buffer *buffer, const char *value)
 {
     if (!buffer || !value) {
         return false;
@@ -233,7 +246,7 @@ bool buffer_write_data(t_buffer *buffer, const void *data, size_t data_size)
 
 bool buffer_read_uint8(t_buffer *buffer, uint8_t *value)
 {
-    if (!buffer || !value || !buffer_has_capacity(buffer, sizeof(uint8_t))) {
+    if (!buffer || !value || !buffer_check_capacity(buffer, sizeof(uint8_t))) {
         return false;
     }
 
@@ -246,7 +259,7 @@ bool buffer_read_uint8(t_buffer *buffer, uint8_t *value)
 
 bool buffer_read_uint16(t_buffer *buffer, uint16_t *value)
 {
-    if (!buffer || !value || !buffer_has_capacity(buffer, sizeof(uint16_t))) {
+    if (!buffer || !value || !buffer_check_capacity(buffer, sizeof(uint16_t))) {
         return false;
     }
 
@@ -262,8 +275,8 @@ bool buffer_read_uint16(t_buffer *buffer, uint16_t *value)
 }
 
 bool buffer_read_uint32(t_buffer *buffer, uint32_t *value)
-{
-    if (!buffer || !value || !buffer_has_capacity(buffer, sizeof(uint32_t))) {
+{       
+    if (!buffer || !value || !buffer_check_capacity(buffer, sizeof(uint32_t))) {
         return false;
     }
 
@@ -290,7 +303,7 @@ char *buffer_read_string(t_buffer *buffer)
     }
 
     // Validar longitud razonable para evitar ataques
-    if (length > MAX_STRING_LENGTH || !buffer_has_capacity(buffer, length)) {
+    if (length > MAX_STRING_LENGTH || !buffer_check_capacity(buffer, length)) {
         // Revertir offset si no se puede leer
         buffer->offset -= sizeof(uint32_t);
         return NULL;
