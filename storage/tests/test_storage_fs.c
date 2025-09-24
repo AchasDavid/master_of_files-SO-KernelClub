@@ -34,7 +34,7 @@ context(test_storage_filesystem) {
             it("limpia un directorio con archivos pero preserva superblock.config") {
                 // Crear superblock.config
                 create_test_superblock(TEST_MOUNT_POINT);
-                
+
                 // Crear algunos archivos de prueba
                 char test_file_path[PATH_MAX];
                 snprintf(test_file_path, sizeof(test_file_path), "%s/test_file.txt", TEST_MOUNT_POINT);
@@ -62,7 +62,7 @@ context(test_storage_filesystem) {
         describe("funcion read_superblock") {
             it("lee superblock.config con contenido correcto") {
                 create_test_superblock(TEST_MOUNT_POINT);
-                
+
                 int fs_size, block_size;
                 int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size, test_logger);
 
@@ -81,7 +81,7 @@ context(test_storage_filesystem) {
             it("retorna error para archivo malformado") {
                 char superblock_path[PATH_MAX];
                 snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config", TEST_MOUNT_POINT);
-                
+
                 FILE* superblock_file = fopen(superblock_path, "w");
                 fprintf(superblock_file, "INVALID_CONTENT=123\n");
                 fclose(superblock_file);

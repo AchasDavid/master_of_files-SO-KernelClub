@@ -135,8 +135,8 @@ clean_buffer:
 
 /**
  * Arma el archivo de hashes de bloques para no tener bloques duplicados
- * 
- * @param mount_point Ruta del directorio donde está montado el filesystem
+ *
+ * @param mount_point Path de la carpeta donde está montado el filesystem
  * @param logger Logger para loggear errores y operaciones
  * @return 0 en caso de exito, -1 si se rompe
  */
@@ -210,7 +210,7 @@ int init_physical_blocks(const char* mount_point, int fs_size, int block_size, t
 /**
  * Arma toda la estructura de archivos con el archivo inicial y sus metadatos
  * 
- * @param mount_point Ruta del directorio donde está montado el filesystem
+ * @param mount_point Path de la carpeta donde está montado el filesystem
  * @param logger Logger para loggear errores y operaciones
  * @return 0 en caso de exito, números negativos (-1 a -6) si se rompe algo
  */
@@ -268,13 +268,13 @@ int init_files(const char* mount_point, t_log* logger) {
 /**
  * Monta el filesystem completo ejecutando todas las funciones de inicialización
  * 
- * @param mount_point Ruta del directorio donde está montado el filesystem
+ * @param mount_point Path de la carpeta donde está montado el filesystem
  * @param logger Logger para loggear errores y operaciones
  * @return 0 en caso de exito, números negativos (-1 a -6) que te dicen qué función se rompió
  */
 int init_storage(const char* mount_point, t_log* logger) {
     int fs_size, block_size;
-    
+
     if (read_superblock(mount_point, &fs_size, &block_size, logger) != 0) return -1;
     if (wipe_storage_content(mount_point, logger) != 0) return -2;
     if (init_bitmap(mount_point, fs_size, block_size, logger) != 0) return -3;

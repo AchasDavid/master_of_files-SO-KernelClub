@@ -10,12 +10,12 @@
 #include <errno.h>
 
 typedef struct {
-    int puerto_escucha;         // Numérico
-    bool fresh_start;           // Booleano  
-    char* punto_montaje;        // String
-    int retardo_operacion;      // Numérico
-    int retardo_acceso_bloque;  // Numérico
-    t_log_level log_level;      // Log level enum
+    int puerto_escucha;
+    bool fresh_start;
+    char* punto_montaje;
+    int retardo_operacion;
+    int retardo_acceso_bloque;
+    t_log_level log_level;
 } t_storage_config;
 
 /**
