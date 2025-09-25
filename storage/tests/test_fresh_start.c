@@ -1,5 +1,6 @@
-#include "../src/storage_fs.h"
+#include "../src/fresh_start/fresh_start.h"
 #include "test_utils.h"
+#include "globals/globals.h"
 #include <commons/bitarray.h>
 #include <commons/config.h>
 #include <cspecs/cspec.h>
@@ -11,21 +12,19 @@
 context(test_storage_filesystem) {
     describe("Funciones de Inicializacion del Filesystem") {
 
-        t_log* test_logger;
-
         before {
             create_test_directory();
-            test_logger = create_test_logger();
+            g_storage_logger = create_test_logger();
         } end
 
         after {
-            destroy_test_logger(test_logger);
+            destroy_test_logger(g_storage_logger);
             cleanup_test_directory();
         } end
 
         describe("funcion wipe_storage_content") {
             it("limpia exitosamente un directorio vacio") {
-                int result = wipe_storage_content(TEST_MOUNT_POINT, test_logger);
+                int result = wipe_storage_content(TEST_MOUNT_POINT);
 
                 should_int(result) be equal to(0);
                 should_bool(is_directory_empty(TEST_MOUNT_POINT)) be truthy;
@@ -45,7 +44,7 @@ context(test_storage_filesystem) {
                 char superblock_path[PATH_MAX];
                 snprintf(superblock_path, sizeof(superblock_path), "%s/superblock.config", TEST_MOUNT_POINT);
 
-                int result = wipe_storage_content(TEST_MOUNT_POINT, test_logger);
+                int result = wipe_storage_content(TEST_MOUNT_POINT);
 
                 should_int(result) be equal to(0);
                 should_bool(file_exists(test_file_path)) be falsey;
@@ -53,7 +52,7 @@ context(test_storage_filesystem) {
             } end
 
             it("retorna error para directorio inexistente") {
-                int result = wipe_storage_content("/non/existent/path", test_logger);
+                int result = wipe_storage_content("/non/existent/path");
 
                 should_int(result) be equal to(-1);
             } end
@@ -64,7 +63,7 @@ context(test_storage_filesystem) {
                 create_test_superblock(TEST_MOUNT_POINT);
 
                 int fs_size, block_size;
-                int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size, test_logger);
+                int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size);
 
                 should_int(result) be equal to(0);
                 should_int(fs_size) be equal to(TEST_FS_SIZE);
@@ -73,7 +72,7 @@ context(test_storage_filesystem) {
 
             it("retorna error para archivo inexistente") {
                 int fs_size, block_size;
-                int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size, test_logger);
+                int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size);
 
                 should_int(result) be equal to(-1);
             } end
@@ -87,7 +86,7 @@ context(test_storage_filesystem) {
                 fclose(superblock_file);
 
                 int fs_size, block_size;
-                int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size, test_logger);
+                int result = read_superblock(TEST_MOUNT_POINT, &fs_size, &block_size);
 
                 should_int(result) be equal to(-2);
             } end
@@ -95,7 +94,7 @@ context(test_storage_filesystem) {
 
         describe("funcion init_bitmap") {
             it("crea bitmap.bin con inicializacion correcta") {
-                int result = init_bitmap(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
+                int result = init_bitmap(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE);
 
                 should_int(result) be equal to(0);
 
@@ -134,7 +133,7 @@ context(test_storage_filesystem) {
             } end
 
             it("retorna error para punto de montaje invalido") {
-                int result = init_bitmap("/invalid/path", TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
+                int result = init_bitmap("/invalid/path", TEST_FS_SIZE, TEST_BLOCK_SIZE);
 
                 should_int(result) be equal to(-1);
             } end
@@ -142,7 +141,7 @@ context(test_storage_filesystem) {
 
         describe("funcion init_blocks_index") {
             it("crea archivo blocks_hash_index.config") {
-                int result = init_blocks_index(TEST_MOUNT_POINT, test_logger);
+                int result = init_blocks_index(TEST_MOUNT_POINT);
 
                 should_int(result) be equal to(0);
 
@@ -153,7 +152,7 @@ context(test_storage_filesystem) {
             } end
 
             it("retorna error para punto de montaje invalido") {
-                int result = init_blocks_index("/invalid/path", test_logger);
+                int result = init_blocks_index("/invalid/path");
 
                 should_int(result) be equal to(-1);
             } end
@@ -161,7 +160,7 @@ context(test_storage_filesystem) {
 
         describe("funcion init_physical_blocks") {
             it("crea directorio physical_blocks con todos los archivos de bloques") {
-                int result = init_physical_blocks(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
+                int result = init_physical_blocks(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE);
 
                 should_int(result) be equal to(0);
 
@@ -185,7 +184,7 @@ context(test_storage_filesystem) {
             } end
 
             it("retorna error para punto de montaje invalido") {
-                int result = init_physical_blocks("/invalid/path", TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
+                int result = init_physical_blocks("/invalid/path", TEST_FS_SIZE, TEST_BLOCK_SIZE);
 
                 should_int(result) be equal to(-1);
             } end
@@ -193,9 +192,9 @@ context(test_storage_filesystem) {
 
         describe("funcion init_files") {
             it("crea estructura completa de archivos con hard links") {
-                init_physical_blocks(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE, test_logger);
+                init_physical_blocks(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE);
 
-                int result = init_files(TEST_MOUNT_POINT, test_logger);
+                int result = init_files(TEST_MOUNT_POINT);
 
                 should_int(result) be equal to(0);
 
