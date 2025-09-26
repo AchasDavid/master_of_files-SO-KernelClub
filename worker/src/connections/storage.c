@@ -36,6 +36,6 @@ int get_block_size(int storage_socket, int *block_size) {
     }
     
     memcpy(block_size, response->buffer, sizeof(int));
-    package_destroy(package_res);
+    package_destroy(response);
     return 0;
 }
