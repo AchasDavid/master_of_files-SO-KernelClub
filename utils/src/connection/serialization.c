@@ -21,6 +21,11 @@ t_buffer *buffer_create(size_t size){
     new_buffer->size = size;
     new_buffer->offset = 0;
     new_buffer->stream = malloc(size);
+    if (!new_buffer->stream)
+    {
+        free(new_buffer);
+        return NULL;
+    }
     new_buffer->is_dynamic = false;
     memset(new_buffer->stream, 0, size);
     if (!new_buffer->stream)
