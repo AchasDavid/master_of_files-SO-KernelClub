@@ -1,9 +1,20 @@
+/**
+ * @file query_control_manager.h
+ * @brief Definiciones para la gestión de Query Controls en el Master
+ */
+
 #ifndef QUERY_CONTROL_MANAGER_H
 #define QUERY_CONTROL_MANAGER_H
 
-#include <utils/serialization.h>
-#include <utils/protocol.h>
+#include <connection/protocol.h>
+#include <connection/serialization.h>
+#include <commons/log.h>
 #include <pthread.h>
+#include <commons/log.h>
+
+// Forward declaration para evitar inclusiones circulares
+// Se utiliza un puntero a esta estructura en las funciones
+typedef struct master t_master;
 
 typedef enum {
     QUERY_STATE_NEW,
@@ -23,7 +34,7 @@ typedef struct {
     t_query_state state;
 } t_query_control_block;
 
-typedef struct {
+typedef struct query_table {
     t_query_control_block *query_list; // Lista de t_query_control_block
 
     // Manejo de estados
@@ -39,31 +50,20 @@ typedef struct {
     pthread_mutex_t query_table_mutex;
 } t_query_table;
 
-/**
- * @brief Maneja la recepción y el procesamiento de la ruta de archivo de consulta y su prioridad desde un cliente.
- *
- * Esta función lee una cadena del búfer proporcionado, que contiene la ruta del archivo de consulta y su prioridad,
- * separadas por el delimitador 0x1F. Analiza la ruta y la prioridad, envía una respuesta de confirmación al cliente,
- * registra la información recibida y prepara el manejo posterior de la ejecución de la consulta.
- *
- * @param buffer Puntero al bufer que contiene los datos entrantes.
- * @param client_socket Descriptor de socket para el cliente conectado.
- * @param logger Pointer al logger para registrar eventos y errores.
- * @return 0 en caso de éxito, negativo en caso de error.
- */
-int manage_query_file_path(t_buffer *required_package,int client_socket, t_log *logger);
+int manage_query_file_path(t_package *response_package, int client_socket, t_master *master);
 
 /**
- * @brief Maneja el proceso de handshake inicial con un cliente de control de consultas.
+ * @brief Genera y devuelve un ID único y secuencial para una nueva query.
  *
- * Esta función envía un ID asignado (actualmente hardcodeado) al cliente para completar el proceso de handshake.
- * Registra cualquier error que ocurra durante el envío del ID.
+ * Esta función incrementa el contador de IDs de queries en la estructura del Master
+ * y devuelve el nuevo ID asignado. Este ID se utiliza para identificar de manera única
+ * cada query gestionada por el sistema.
  *
- * @param buffer Puntero al bufer que contiene los datos entrantes.
- * @param client_socket Descriptor de socket para el cliente conectado.
- * @param logger Pointer al logger para registrar eventos y errores.
- * @return 0 en caso de éxito, negativo en caso de error.
+ * @param master Puntero a la estructura principal del Master que contiene la tabla de query.
+ * @return El ID único y secuencial asignado a la nueva query.
  */
-int manage_query_handshake(t_buffer *buffer, int client_socket, t_log *logger);
+int generate_query_id(t_master *master);
+
+int manage_query_handshake(int client_socket, t_log *logger);
 
 #endif
