@@ -13,11 +13,16 @@ int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *maste
         return -1;
     }
     log_info(master->logger, "Handshake recibido de Worker ID: %s", worker_id);
-    t_package* response = package_create(OP_WORKER_HANDSHAKE_RES, buffer); // Para no enviar buffer vacío
+    t_package* response = package_create(OP_WORKER_ACK, buffer); // Para no enviar buffer vacío
     if (package_send(response, client_socket) != 0)
     {
         log_error(master->logger, "Error al enviar respuesta de handshake al Worker id: %s - socket: %d", worker_id, client_socket);
+        package_destroy(response);
         return -1;
     }
+
+    // Libero recursos
+    free(worker_id);
+    package_destroy(response);
     return 0;
 }

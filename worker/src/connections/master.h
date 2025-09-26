@@ -1,11 +1,10 @@
 #ifndef CONNECTION_MASTER_H
 #define CONNECTION_MASTER_H
 
-#include <utils/serialization.h>
+#include <utils/src/connection/serialization.h>
 #include <utils/logger.h>
 #include <utils/client_socket.h>
-#include <utils/protocol.h>
-#include "common.h"
+#include <utils/src/connection/protocol.h>
 
 /**
  * Establece una conexión y realiza el handshake con el Master.
