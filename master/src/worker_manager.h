@@ -51,4 +51,7 @@ typedef struct worker_table {
  * TODO: Implementar almacenamiento del ID del Worker en la tabla de workers para luego planificar.
  */
 int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *master);
+
+t_worker_control_block *create_worker(t_worker_table *table, int worker_id, int socket_fd);
+
 #endif
