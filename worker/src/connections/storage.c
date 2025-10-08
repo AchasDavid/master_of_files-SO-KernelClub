@@ -35,7 +35,12 @@ int get_block_size(int storage_socket, uint16_t *block_size) {
         return -1;
     }
     
-    package_read_uint16(response, block_size);
+    if(!package_read_uint16(response, block_size)) {
+        log_error(logger, "Error al leer del buffer el tamaño de bloque");
+        package_destroy(response);
+        return -1;
+    }
+    
     package_destroy(response);
     return 0;
 }
