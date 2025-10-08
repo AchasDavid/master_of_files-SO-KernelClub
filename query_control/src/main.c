@@ -83,16 +83,19 @@ int main(int argc, char* argv[])
     if (package_handshake == NULL) 
     {
         log_error(logger, "Error al crear el paquete para el handshake al master");
+        retval = -6;
         goto clean_socket;
     }
 
-    // agrego un string como campo del buffer
-    package_add_string(package_handshake, "QUERY_CONTROL_HANDSHAKE");
+    // agrego un string como campo del buffer y verifico Ã©xito
+    if (!package_add_string(package_handshake, "QUERY_CONTROL_HANDSHAKE")) {
+        retval = fail_pkg(logger, "Error al agregar string al paquete handshake", &package_handshake, -6);
+        goto clean_socket;
+    }
 
-    // Envio el paquete
-    if (package_send(package_handshake, master_socket) != 0)
-    {
-        log_error(logger, "Error al enviar el paquete para handshake al master");
+    // Envio del paquete
+    if (package_send(package_handshake, master_socket) != 0) {
+        retval = fail_pkg(logger, "Error al enviar el paquete handshake al master", &package_handshake, -6);
         goto clean_socket;
     }
 
@@ -102,46 +105,64 @@ int main(int argc, char* argv[])
     // Preparo para recibir respuesta
     t_package *response_package = package_receive(master_socket);
 
-    if (!response_package || response_package->operation_code != OP_QUERY_HANDSHAKE)
-    {
-        log_error(logger, "Error al recibir respuesta al handshake con Master!");
+    if (!response_package) {
+        retval = fail_pkg(logger, "Error al recibir respuesta de handshake", &response_package, -6);
+        goto clean_socket;
+    }
+    if (response_package->operation_code != OP_QUERY_HANDSHAKE) {
+        retval = fail_pkg(logger, "Handshake invÃ¡lido (opcode inesperado)", &response_package, -6);
         goto clean_socket;
     }
 
     package_destroy(response_package);
     
-    log_info(logger, "## Conexión al Master exitosa. IP: %s, Puerto: %s.", query_control_config->ip, query_control_config->port);
+    log_info(logger, "## ConexiÃ³n al Master exitosa. IP: %s, Puerto: %s.", query_control_config->ip, query_control_config->port);
 
-    // Comienza petición de ejecución de query
-    log_info(logger, "## Solicitud de ejecución de Query: %s, prioridad: %d", query_filepath, priority);
+    // Comienza peticiÃ³n de ejecuciÃ³n de query
+    log_info(logger, "## Solicitud de ejecuciÃ³n de Query: %s, prioridad: %d", query_filepath, priority);
 
     t_package* package_to_send = package_create_empty(OP_QUERY_FILE_PATH);
-    package_add_string(package_to_send, query_filepath);
-    package_add_uint8(package_to_send, (uint8_t)priority);
-
-    int connection_code = package_send(package_to_send, master_socket);
-    if (connection_code < 0)
-    {
+    if (!package_to_send) {
+        log_error(logger, "Error al crear el paquete para envÃ­o de Query");
+        retval = -6;
         goto clean_socket;
     }
 
-    // Preparo para recibir respuesta
-    response_package = package_receive(master_socket); // --> Reutilzó response package
+    // Ejecutar y validar ambos package_add
+    if (!package_add_string(package_to_send, query_filepath)) {
+        retval = fail_pkg(logger, "Error al agregar path de Query al paquete", &package_to_send, -6);
+        goto clean_socket;
+    }
+    if (!package_add_uint8(package_to_send, (uint8_t)priority)) {
+        retval = fail_pkg(logger, "Error al agregar prioridad al paquete", &package_to_send, -6);
+        goto clean_socket;
+    }
 
-    //Porque OP_QUERY_FILE_PATH es quien deberia manejar la respuesta? No deberia ser una op distinta?
-    /*if (response_package->operation_code != OP_QUERY_FILE_PATH)
+    if (package_send(package_to_send, master_socket) < 0) {
+        retval = fail_pkg(logger, "Error al enviar paquete con Query al Master", &package_to_send, -6);
+        goto clean_socket;  
+    }
+
+    package_destroy(package_to_send);
+
+
+    // Preparo para recibir respuesta
+    response_package = package_receive(master_socket); 
+
+    if (response_package->operation_code != QC_OP_MASTER_CONNECTION_OK)
     {
-        log_error(logger, "Error al recibir respuesta..."); 
-    }*/
+        retval = fail_pkg(logger, "Error al recibir respuesta de conexion de Master", &response_package, -7); 
+    }
+
     log_info(logger, "Paquete con path de query: %s y prioridad: %d enviado al master correctamente", query_filepath, priority);
 
 
-    // === Loop de recepción: READ / FIN ===
+    // === Loop de recepciÃ³n: READ / FIN ===
     while (true) {
     t_package *resp = package_receive(master_socket);
 
     if (!resp) {
-        log_error(logger, "Conexión con Master cerrada inesperadamente");
+        log_error(logger, "ConexiÃ³n con Master cerrada inesperadamente");
         retval = -7;
         break;
     }
@@ -189,11 +210,13 @@ int main(int argc, char* argv[])
             //Motivos :
             /*
             1 -> Error
+            2 -> Prioridad y 3 -> Desconexion ? 
+            O serian 2 OP_CODE separados : QC_OP_MASTER_FIN_DESCONEXION y QC_OP_MASTER_FIN_PRIORIDAD?
             */
             uint8_t motivo = 1;
             if (!package_read_uint8(resp, &motivo)) {
                 // Abstraccion de errores
-                retval = fail_pkg(logger, "Paquete FIN inválido", &resp, -7);
+                retval = fail_pkg(logger, "Paquete FIN invÃ¡lido", &resp, -7);
                 goto clean_socket;
             }
             const char* motivoString = (motivo==1) ? "ERROR" : "DESCONEXION";
@@ -210,13 +233,13 @@ int main(int argc, char* argv[])
          */
         default:
             log_warning(logger, "Error al recibir respuesta, opcode %u desconocido", resp->operation_code);
+            retval = fail_pkg(logger, "", &resp, -7);
             break;
     }
 
     package_destroy(resp);
 }
 
-    package_destroy(package_to_send);
     package_destroy(response_package);
 
 clean_socket:
@@ -231,3 +254,4 @@ error:
 
 
 }
+

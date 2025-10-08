@@ -19,7 +19,8 @@ typedef enum {
     OP_QUERY_HANDSHAKE,
     OP_QUERY_FILE_PATH,
     QC_OP_READ_DATA,
-    QC_OP_MASTER_FIN 
+    QC_OP_MASTER_FIN,
+    QC_OP_MASTER_CONNECTION_OK 
  } t_query_control_op_code;
 
 #endif
