@@ -16,17 +16,14 @@ int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *maste
     }
 
     // Registro el Worker en la tabla de control
-    t_worker_control_block *wcb = create_worker(&(master->workers_table), worker_id, client_socket);
+    t_worker_control_block *wcb = create_worker(master->workers_table, worker_id, client_socket);
     if (wcb == NULL) {
         log_error(master->logger, "Error al crear el control block para Worker ID: %s", worker_id);
         free(worker_id);
         return -1;
     }
-    if (worker_table_add(master->workers_table, worker_id, client_socket) != 0) {
-        log_error(master->logger, "Error al registrar Worker ID: %s - socket: %d", worker_id, client_socket);
-        free(worker_id);
-        return -1;
-    }
+    log_info(master->logger, "Worker ID: %s registrado exitosamente", worker_id);
+    log_debug(master->logger, "Total Workers conectados: %d", master->workers_table->total_workers_connected);
 
     // Envío ACK al Worker
     log_info(master->logger, "Handshake recibido de Worker ID: %s", worker_id);
@@ -42,18 +39,21 @@ int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *maste
     tryDispatch();
 
     // Libero recursos
-    free(worker_id);
-    package_destroy(response);
+    if(worker_id)
+    {
+        free(worker_id);
+    }
+
     return 0;
 }
 
 // Crea un nuevo WCB y lo inicializa
-t_worker_control_block *create_worker(t_worker_table *table, int worker_id, int socket_fd) {
+t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, int socket_fd) {
     // loqueamos la tabla para manipular datos administrativos
     pthread_mutex_lock(&table->worker_table_mutex);
 
     t_worker_control_block *wcb = malloc(sizeof(t_worker_control_block));
-    wcb->worker_id = worker_id;
+    wcb->worker_id = atoi(worker_id);
     wcb->ip_address = NULL; // TODO: Obtener IP del socket
     wcb->port = -1; // TODO: Obtener puerto del socket
     wcb->current_query_id = -1; // No tiene query asignada inicialmente

@@ -67,4 +67,4 @@ int generate_query_id(t_master *master);
 
 int manage_query_handshake(int client_socket, t_log *logger);
 
-#endif
+#endif // QUERY_CONTROL_MANAGER_H

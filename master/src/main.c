@@ -170,10 +170,18 @@ void* handle_client(void* arg) {
                 log_warning(master->logger, "Operacion desconocida recibida del cliente %d", client_socket);
                 break;
         }
-        package_destroy(required_package); // Libera el paquete recibido
+        if(required_package)
+        {
+            package_destroy(required_package); // Libera el paquete recibido
+        }
+            
     }
 
     close(client_socket);
-    free(client_data);
+    if(client_data)
+    {
+        free(client_data);
+    }
+        
     return NULL;
 }
