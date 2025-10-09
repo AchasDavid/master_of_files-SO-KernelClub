@@ -55,7 +55,7 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     }
 
     // Verifico si hay workers disponibles para asignar la query
-    if(tryDispatch()!=0)
+    if(try_dispatch(master)!=0)
     {
         log_error(master->logger, "Error al intentar despachar una query luego del handshake del query id: %d - socket: %d", assigned_id, client_socket);
     }

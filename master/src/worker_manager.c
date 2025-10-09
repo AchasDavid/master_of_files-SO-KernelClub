@@ -36,7 +36,7 @@ int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *maste
     }
 
     // Verifico si hay queries pendientes para asignar
-    if(tryDispatch()!=0)
+    if(try_dispatch(master)!=0)
     {
         log_error(master->logger, "Error al intentar despachar una query luego del handshake del Worker id: %s - socket: %d", worker_id, client_socket);
     }
