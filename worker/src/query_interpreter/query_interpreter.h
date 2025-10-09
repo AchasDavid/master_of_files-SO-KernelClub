@@ -1,0 +1,70 @@
+#ifndef QUERY_INTERPRETER_H
+#define QUERY_INTERPRETER_H
+
+#include <stdint.h>
+#include <stdlib.h>
+#include <commons/string.h>
+
+typedef enum {
+    CREATE,
+    TRUNCATE,
+    WRITE,
+    READ,
+    TAG,
+    COMMIT,
+    FLUSH,
+    DELETE,
+    END,
+    UNKNOWN
+} operation_t;
+
+typedef struct {
+    char *file;
+    char *tag;
+} file_tag_t;
+
+typedef struct {
+    char *file;
+    char *tag;
+    size_t size;
+} truncate_params_t;
+
+typedef struct {
+    char *file;
+    char *tag;
+    uint32_t base;
+    uint8_t *data;
+} write_params_t;
+
+typedef struct {
+    char *file;
+    char *tag;
+    uint32_t base;
+    size_t size;
+} read_params_t;
+
+typedef struct {
+    char *file_src;
+    char *tag_src;
+    char *file_dst;
+    char *tag_dst;
+} tag_params_t;
+
+
+typedef struct {
+    operation_t operation;
+    union {
+        file_tag_t file_tag;
+        truncate_params_t truncate;
+        write_params_t write;
+        read_params_t read;
+        tag_params_t tag;
+    };
+} instruction_t;
+
+int fetch_instruction(char *instructions_path, uint32_t program_counter, char *raw_instruction);
+int decode_instruction(const char *raw_instruction, instruction_t *instruction);
+void free_instruction(instruction_t *instruction);
+int execute_instruction(const instruction_t *instruction);
+
+#endif
