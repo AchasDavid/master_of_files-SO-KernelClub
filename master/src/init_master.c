@@ -18,7 +18,7 @@ t_master* init_master(char *ip, char *port, int aging_interval, char *scheduling
         log_error(logger, "No se pudo asignar memoria para la tabla de queries");
         goto error;
     }
-    master->queries_table->query_list = NULL;
+    master->queries_table->query_list = list_create();
     master->queries_table->total_queries = 0;
     master->queries_table->next_query_id = -1; // Comienza en 0, se incrementa con cada nueva query
 

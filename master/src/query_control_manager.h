@@ -67,4 +67,6 @@ int generate_query_id(t_master *master);
 
 int manage_query_handshake(int client_socket, t_log *logger);
 
+t_query_control_block *create_query(t_query_table *table, int query_id, char *query_file_path, int priority, int assigned_worker_id);
+
 #endif // QUERY_CONTROL_MANAGER_H
