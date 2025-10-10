@@ -210,7 +210,7 @@ void free_instruction(instruction_t *instruction) {
     }
 }
 
-int execute_instruction(instruction_t *instruction, int socket_storage, int socket_master, memory_manager_t *memory_manager) {
+int execute_instruction(instruction_t *instruction, int socket_storage, int socket_master, memory_manager_t *memory_manager, int query_id, int worker_id) {
     if (instruction == NULL) {
         return -1;
     }
@@ -220,36 +220,60 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             create_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
             break;
         case TRUNCATE:
-            // REMINDER: Previamente se debe verificar que el size sea múltiplo del tamaño del bloque
+            if (instruction->truncate.size % BLOCK_SIZE != 0) {
+                return -1;
+            }
             truncate_file_in_storage(socket_storage, instruction->truncate.file, instruction->truncate.tag, instruction->truncate.size);
             break;
         case WRITE:
-            page_table_t *page_table = mm_find_page_table(memory_manager, instruction->write.file, instruction->write.tag);
+            page_table_t *page_table = mm_get_or_create_page_table(memory_manager, file, tag);
             if (page_table == NULL) {
-                page_table = mm_get_or_create_page_table(memory_manager, instruction->write.file, instruction->write.tag, 1);
+                return -1;
             }
-            
+            int result = mm_write_to_memory(memory_manager, page_table, instruction->write.base, instruction->write.data);
+            if (result != 0) {
+                return -1;
+            }
             break;
         case READ:
-            // Lógica para ejecutar la instrucción READ
+            page_table_t *page_table = mm_get_or_create_page_table(memory_manager, file, tag);
+            if (page_table == NULL) {
+                return -1;
+            }
+            int result = mm_read_from_memory(memory_manager, page_table, instruction->read.base, instruction->read.size);
+            if (result != 0) {
+                return -1;
+            }
             break;
         case TAG:
-            // Lógica para ejecutar la instrucción TAG
             fork_file_in_storage(socket_storage, instruction->tag.file_src, instruction->tag.tag_src, instruction->tag.file_dst, instruction->tag.tag_dst);
             break;
         case COMMIT:
-            // REMINDER: Previamente se debe hacer un flush
             commit_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
             break;
         case FLUSH:
-            // Lógica para ejecutar la instrucción FLUSH
+            page_table_t *page_table = mm_get_or_create_page_table(memory_manager, instruction->file_tag.file, instruction->file_tag.tag);
+            if (page_table == NULL) {
+                return -1;
+            }
+            
+            size_t dirty_count = 0;
+            page_t *dirty_pages = mm_get_dirty_pages(memory_manager, instruction->file_tag.file, instruction->file_tag.tag, &dirty_count);
+
+            for (size_t i = 0; i < dirty_count; i++) {
+                page_t *p = &dirty_pages[i];
+
+                int result = write_block_to_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag, p->page_number, p->frame_data, p->frame_size);
+            }
+
+            free(dirty_pages);
+            mm_mark_all_clean(memory_manager, instruction->file_tag.file, instruction->file_tag.tag);
             break;
         case DELETE:
             delete_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag);
             break;
         case END:
-            // Lógica para ejecutar la instrucción END
-            // TODO: Buscar una forma de obtener el worker_id
+            end_query_in_master(socket_master, query_id, worker_id);
             break;
         default:
             return -1;

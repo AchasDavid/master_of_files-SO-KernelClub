@@ -29,5 +29,6 @@ int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t s
 int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst);
 int commit_file_in_storage(int storage_socket, char *file, char *tag);
 int delete_file_in_storage(int storage_socket, char *file, char *tag);
+int write_block_to_storage(int storage_socket, char *file, char *tag, uint32_t page_number, void *frame_data, size_t frame_size);
 
 #endif

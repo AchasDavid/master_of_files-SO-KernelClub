@@ -2,10 +2,14 @@
 #define PAGE_TABLE_H
 
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 typedef struct
 {
     uint32_t frame;
+    bool dirty;
+    bool present;
 } pt_entry_t;
 
 typedef struct
@@ -55,5 +59,13 @@ int pt_translate(const page_table_t *page_table,
                   uintptr_t virtual_address,
                   uint32_t *out_frame,
                   size_t *out_offset);
+
+void pt_mark_dirty(page_table_t *page_table, uint32_t page_number);
+void pt_mark_clean(page_table_t *page_table, uint32_t page_number);
+void pt_mark_present(page_table_t *page_table, uint32_t page_number);
+void pt_mark_absent(page_table_t *page_table, uint32_t page_number);
+bool pt_is_dirty(const page_table_t *page_table, uint32_t page_number);
+bool pt_is_present(const page_table_t *page_table, uint32_t page_number);
+pt_entry_t *pt_get_entry(page_table_t *page_table, uint32_t page_number);
 
 #endif

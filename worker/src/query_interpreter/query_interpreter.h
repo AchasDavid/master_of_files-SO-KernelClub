@@ -38,7 +38,7 @@ typedef struct {
     char *file;
     char *tag;
     uint32_t base;
-    uint8_t *data;
+    char *data;
 } write_params_t;
 
 typedef struct {
@@ -70,6 +70,6 @@ typedef struct {
 int fetch_instruction(char *instructions_path, uint32_t program_counter, char **raw_instruction);
 int decode_instruction(char *raw_instruction, instruction_t *instruction);
 void free_instruction(instruction_t *instruction);
-int execute_instruction(const instruction_t *instruction, int socket_storage, int socket_master, memory_manager_t *memory_manager);
+int execute_instruction(instruction_t *instruction, int socket_storage, int socket_master, memory_manager_t *memory_manager, int query_id, int worker_id);
 
 #endif
