@@ -22,9 +22,6 @@ static inline int fail_pkg(t_log* logger, const char* msg, t_package** pkgr, int
 
 int main(int argc, char* argv[])
 {
-    char* config_filepath = argv[1];
-    char* query_filepath = argv[2];
-    int priority = atoi(argv[3]);
     int retval = 0;
 
     if (argc != 4) {
@@ -32,6 +29,11 @@ int main(int argc, char* argv[])
         retval = -1;
         goto error;
     }
+
+    char* config_filepath = argv[1];
+    char* query_filepath = argv[2];
+    int priority = atoi(argv[3]);
+
 
     if (priority < 0) {
         printf("[ERROR]: La prioridad no puede ser negativa\n");

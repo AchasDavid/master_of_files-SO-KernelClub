@@ -7,20 +7,16 @@
 typedef enum {
     OP_WORKER_HANDSHAKE_REQ,
     OP_WORKER_HANDSHAKE_RES,
+    OP_QUERY_HANDSHAKE,
+    OP_QUERY_FILE_PATH,
+    QC_OP_READ_DATA,
+    QC_OP_MASTER_FIN,
+    QC_OP_MASTER_CONNECTION_OK 
 } t_master_op_code;
 
 typedef enum {
     STORAGE_OP_WORKER_SEND_ID_REQ,
     STORAGE_OP_WORKER_SEND_ID_RES,
 } t_storage_op_code;
-
-// Operaciones entre Master <-> Query Control
-typedef enum {
-    OP_QUERY_HANDSHAKE,
-    OP_QUERY_FILE_PATH,
-    QC_OP_READ_DATA,
-    QC_OP_MASTER_FIN,
-    QC_OP_MASTER_CONNECTION_OK 
- } t_query_control_op_code;
 
 #endif
