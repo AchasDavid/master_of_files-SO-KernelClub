@@ -1,181 +1,372 @@
-#include <cspecs/cspec.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <limits.h>
-#include <sys/stat.h>
-#include "../src/ops.h"
 #include "../src/fresh_start/fresh_start.h"
 #include "../src/globals/globals.h"
+#include "../src/ops.h"
+#include "../src/storage_utils.h"
 #include "test_utils.h"
+#include <cspecs/cspec.h>
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 
 context(test_ops) {
-    describe("create_file op") {
-        t_log* test_logger;
+  describe("create_file op") {
+    t_log *test_logger;
 
-        before {
-            create_test_directory();
-            test_logger = create_test_logger();
+    before {
+      create_test_directory();
+      test_logger = create_test_logger();
 
-            // Crear estructura básica del filesystem para las pruebas
-            char files_dir[PATH_MAX];
-            snprintf(files_dir, sizeof(files_dir), "%s/files", TEST_MOUNT_POINT);
-            mkdir(files_dir, 0755);
-        } end
+      // Crear estructura básica del filesystem para las pruebas
+      char files_dir[PATH_MAX];
+      snprintf(files_dir, sizeof(files_dir), "%s/files", TEST_MOUNT_POINT);
+      mkdir(files_dir, 0755);
+    }
+    end
 
         after {
-            destroy_test_logger(test_logger);
-            cleanup_test_directory();
-        } end
+      destroy_test_logger(test_logger);
+      cleanup_test_directory();
+    }
+    end
 
-        it("crea archivo nuevo con tag correctamente") {
-            int result = create_file("test_file", "v1", TEST_MOUNT_POINT, test_logger);
+    it("crea archivo nuevo con tag correctamente") {
+      int result =
+          create_file("test_file", "v1", TEST_MOUNT_POINT, test_logger);
 
-            should_int(result) be equal to(0);
+      should_int(result) be equal to(0);
 
-            // Verificar estructura de carpetas creada
-            char file_dir[PATH_MAX];
-            snprintf(file_dir, sizeof(file_dir), "%s/files/test_file", TEST_MOUNT_POINT);
-            should_bool(directory_exists(file_dir)) be truthy;
+      // Verificar estructura de carpetas creada
+      char file_dir[PATH_MAX];
+      snprintf(file_dir, sizeof(file_dir), "%s/files/test_file",
+               TEST_MOUNT_POINT);
+      should_bool(directory_exists(file_dir)) be truthy;
 
-            char tag_dir[PATH_MAX];
-            snprintf(tag_dir, sizeof(tag_dir), "%s/files/test_file/v1", TEST_MOUNT_POINT);
-            should_bool(directory_exists(tag_dir)) be truthy;
+      char tag_dir[PATH_MAX];
+      snprintf(tag_dir, sizeof(tag_dir), "%s/files/test_file/v1",
+               TEST_MOUNT_POINT);
+      should_bool(directory_exists(tag_dir)) be truthy;
 
-            char logical_blocks_dir[PATH_MAX];
-            snprintf(logical_blocks_dir, sizeof(logical_blocks_dir), "%s/files/test_file/v1/logical_blocks", TEST_MOUNT_POINT);
-            should_bool(directory_exists(logical_blocks_dir)) be truthy;
+      char logical_blocks_dir[PATH_MAX];
+      snprintf(logical_blocks_dir, sizeof(logical_blocks_dir),
+               "%s/files/test_file/v1/logical_blocks", TEST_MOUNT_POINT);
+      should_bool(directory_exists(logical_blocks_dir)) be truthy;
 
-            // Verificar archivo de metadata
-            char metadata_file[PATH_MAX];
-            snprintf(metadata_file, sizeof(metadata_file), "%s/files/test_file/v1/metadata.config", TEST_MOUNT_POINT);
-            should_bool(file_exists(metadata_file)) be truthy;
+      // Verificar archivo de metadata
+      char metadata_file[PATH_MAX];
+      snprintf(metadata_file, sizeof(metadata_file),
+               "%s/files/test_file/v1/metadata.config", TEST_MOUNT_POINT);
+      should_bool(file_exists(metadata_file)) be truthy;
 
-            // Verificar contenido de metadata
-            char metadata_content[256];
-            read_file_contents(metadata_file, metadata_content, sizeof(metadata_content));
-            should_ptr(strstr(metadata_content, "SIZE=0")) not be null;
-            should_ptr(strstr(metadata_content, "BLOCKS=[]")) not be null;
-            should_ptr(strstr(metadata_content, "ESTADO=WORK_IN_PROGRESS")) not be null;
-        } end
+      // Verificar contenido de metadata
+      char metadata_content[256];
+      read_file_contents(metadata_file, metadata_content,
+                         sizeof(metadata_content));
+      should_ptr(strstr(metadata_content, "SIZE=0")) not be null;
+      should_ptr(strstr(metadata_content, "BLOCKS=[]")) not be null;
+      should_ptr(strstr(metadata_content, "ESTADO=WORK_IN_PROGRESS"))
+          not be null;
+    }
+    end
 
-        it("retorna error si ya existe la carpeta del archivo con el mismo tag") {
-            create_file("existing_file", "existing_tag", TEST_MOUNT_POINT, test_logger);
+    it("retorna error si ya existe la carpeta del archivo con el mismo tag") {
+      create_file("existing_file", "existing_tag", TEST_MOUNT_POINT,
+                  test_logger);
 
-            int result = create_file("existing_file", "existing_tag", TEST_MOUNT_POINT, test_logger);
+      int result = create_file("existing_file", "existing_tag",
+                               TEST_MOUNT_POINT, test_logger);
 
-            should_int(result) be equal to(-1);
-        } end
+      should_int(result) be equal to(-1);
+    }
+    end
 
-        it("crea multiples tags para el mismo archivo") {
-            create_file("multi_tag_file", "tag1", TEST_MOUNT_POINT, test_logger);
-            int result = create_file("multi_tag_file", "tag2", TEST_MOUNT_POINT, test_logger);
+    it("crea multiples tags para el mismo archivo") {
+      create_file("multi_tag_file", "tag1", TEST_MOUNT_POINT, test_logger);
+      int result =
+          create_file("multi_tag_file", "tag2", TEST_MOUNT_POINT, test_logger);
 
-            should_int(result) be equal to(0);
+      should_int(result) be equal to(0);
 
-            char tag1_dir[PATH_MAX], tag2_dir[PATH_MAX];
-            snprintf(tag1_dir, sizeof(tag1_dir), "%s/files/multi_tag_file/tag1", TEST_MOUNT_POINT);
-            snprintf(tag2_dir, sizeof(tag2_dir), "%s/files/multi_tag_file/tag2", TEST_MOUNT_POINT);
+      char tag1_dir[PATH_MAX], tag2_dir[PATH_MAX];
+      snprintf(tag1_dir, sizeof(tag1_dir), "%s/files/multi_tag_file/tag1",
+               TEST_MOUNT_POINT);
+      snprintf(tag2_dir, sizeof(tag2_dir), "%s/files/multi_tag_file/tag2",
+               TEST_MOUNT_POINT);
 
-            should_bool(directory_exists(tag1_dir)) be truthy;
-            should_bool(directory_exists(tag2_dir)) be truthy;
-        } end
-    } end
+      should_bool(directory_exists(tag1_dir)) be truthy;
+      should_bool(directory_exists(tag2_dir)) be truthy;
+    }
+    end
+  }
+  end
 
     describe("truncate_file op") {
-        t_log* test_logger;
+    t_log *test_logger;
 
-        before {
-            create_test_directory();
-            test_logger = create_test_logger();
-            g_storage_logger = test_logger;  // Para que init_storage use el logger correcto
+    before {
+      create_test_directory();
+      test_logger = create_test_logger();
+      g_storage_logger =
+          test_logger; // Para que init_storage use el logger correcto
 
-            // Crear superblock.config y usar fresh start del storage
-            create_test_superblock(TEST_MOUNT_POINT);
-            init_storage(TEST_MOUNT_POINT);
-        } end
+      // Crear superblock.config y usar fresh start del storage
+      create_test_superblock(TEST_MOUNT_POINT);
+      init_storage(TEST_MOUNT_POINT);
+    }
+    end
 
         after {
-            destroy_test_logger(test_logger);
-            cleanup_test_directory();
-        } end
+      destroy_test_logger(test_logger);
+      cleanup_test_directory();
+    }
+    end
 
-        it("trunca archivo reduciendo el tamaño correctamente") {
-            // Crear archivo de prueba
-            create_file("test_truncate", "v1", TEST_MOUNT_POINT, test_logger);
+    it("trunca archivo reduciendo el tamaño correctamente") {
+      // Crear archivo de prueba
+      create_file("test_truncate", "v1", TEST_MOUNT_POINT, test_logger);
 
-            // Simular archivo con 3 bloques
-            char metadata_path[PATH_MAX];
-            snprintf(metadata_path, sizeof(metadata_path), "%s/files/test_truncate/v1/metadata.config", TEST_MOUNT_POINT);
-            FILE* metadata = fopen(metadata_path, "w");
-            fprintf(metadata, "SIZE=384\nBLOCKS=[1,2,3]\nESTADO=WORK_IN_PROGRESS\n");
-            fclose(metadata);
+      // Simular archivo con 3 bloques
+      char metadata_path[PATH_MAX];
+      snprintf(metadata_path, sizeof(metadata_path),
+               "%s/files/test_truncate/v1/metadata.config", TEST_MOUNT_POINT);
+      FILE *metadata = fopen(metadata_path, "w");
+      fprintf(metadata, "SIZE=384\nBLOCKS=[1,2,3]\nESTADO=WORK_IN_PROGRESS\n");
+      fclose(metadata);
 
-            // Truncar a 2 bloques (256 bytes)
-            int result = truncate_file("test_truncate", "v1", 256, TEST_MOUNT_POINT, test_logger);
+      // Truncar a 2 bloques (256 bytes)
+      int result = truncate_file("test_truncate", "v1", 256, TEST_MOUNT_POINT,
+                                 test_logger);
 
-            should_int(result) be equal to(0);
+      should_int(result) be equal to(0);
 
-            // Verificar que la metadata se actualizó correctamente
-            char metadata_content[256];
-            read_file_contents(metadata_path, metadata_content, sizeof(metadata_content));
-            should_ptr(strstr(metadata_content, "SIZE=256")) not be null;
-            should_ptr(strstr(metadata_content, "BLOCKS=[1,2]")) not be null;
-        } end
+      // Verificar que la metadata se actualizó correctamente
+      char metadata_content[256];
+      read_file_contents(metadata_path, metadata_content,
+                         sizeof(metadata_content));
+      should_ptr(strstr(metadata_content, "SIZE=256")) not be null;
+      should_ptr(strstr(metadata_content, "BLOCKS=[1,2]")) not be null;
+    }
+    end
 
-        it("expande archivo creando nuevos bloques correctamente") {
-            // Crear archivo de prueba con 1 bloque
-            create_file("test_expand", "v1", TEST_MOUNT_POINT, test_logger);
+    it("expande archivo creando nuevos bloques correctamente") {
+      // Crear archivo de prueba con 1 bloque
+      create_file("test_expand", "v1", TEST_MOUNT_POINT, test_logger);
 
-            char metadata_path[PATH_MAX];
-            snprintf(metadata_path, sizeof(metadata_path), "%s/files/test_expand/v1/metadata.config", TEST_MOUNT_POINT);
-            FILE* metadata = fopen(metadata_path, "w");
-            fprintf(metadata, "SIZE=128\nBLOCKS=[1]\nESTADO=WORK_IN_PROGRESS\n");
-            fclose(metadata);
+      char metadata_path[PATH_MAX];
+      snprintf(metadata_path, sizeof(metadata_path),
+               "%s/files/test_expand/v1/metadata.config", TEST_MOUNT_POINT);
+      FILE *metadata = fopen(metadata_path, "w");
+      fprintf(metadata, "SIZE=128\nBLOCKS=[1]\nESTADO=WORK_IN_PROGRESS\n");
+      fclose(metadata);
 
-            // Expandir a 3 bloques (384 bytes)
-            int result = truncate_file("test_expand", "v1", 384, TEST_MOUNT_POINT, test_logger);
+      // Expandir a 3 bloques (384 bytes)
+      int result = truncate_file("test_expand", "v1", 384, TEST_MOUNT_POINT,
+                                 test_logger);
 
-            should_int(result) be equal to(0);
+      should_int(result) be equal to(0);
 
-            // Verificar que la metadata se actualizó correctamente
-            char metadata_content[256];
-            read_file_contents(metadata_path, metadata_content, sizeof(metadata_content));
-            should_ptr(strstr(metadata_content, "SIZE=384")) not be null;
-            should_ptr(strstr(metadata_content, "BLOCKS=[1,0,0]")) not be null;
-        } end
+      // Verificar que la metadata se actualizó correctamente
+      char metadata_content[256];
+      read_file_contents(metadata_path, metadata_content,
+                         sizeof(metadata_content));
+      should_ptr(strstr(metadata_content, "SIZE=384")) not be null;
+      should_ptr(strstr(metadata_content, "BLOCKS=[1,0,0]")) not be null;
+    }
+    end
 
-        it("retorna error para archivo inexistente") {
-            int result = truncate_file("nonexistent", "v1", 256, TEST_MOUNT_POINT, test_logger);
+    it("retorna error para archivo inexistente") {
+      int result = truncate_file("nonexistent", "v1", 256, TEST_MOUNT_POINT,
+                                 test_logger);
 
-            should_int(result) be equal to(-2);
-        } end
+      should_int(result) be equal to(-2);
+    }
+    end
 
-        it("retorna error si no puede abrir superblock config") {
-            int result = truncate_file("test", "v1", 256, "/invalid/path", test_logger);
+    it("retorna error si no puede abrir superblock config") {
+      int result =
+          truncate_file("test", "v1", 256, "/invalid/path", test_logger);
 
-            should_int(result) be equal to(-1);
-        } end
+      should_int(result) be equal to(-1);
+    }
+    end
 
-        it("no modifica nada si el nuevo tamaño encaja en la misma cantidad de bloques") {
-            // Crear archivo de prueba
-            create_file("test_same_blocks", "v1", TEST_MOUNT_POINT, test_logger);
+    it("no modifica nada si el nuevo tamaño encaja en la misma cantidad de "
+       "bloques") {
+      // Crear archivo de prueba
+      create_file("test_same_blocks", "v1", TEST_MOUNT_POINT, test_logger);
 
-            char metadata_path[PATH_MAX];
-            snprintf(metadata_path, sizeof(metadata_path), "%s/files/test_same_blocks/v1/metadata.config", TEST_MOUNT_POINT);
-            FILE* metadata = fopen(metadata_path, "w");
-            fprintf(metadata, "SIZE=200\nBLOCKS=[1,2]\nESTADO=WORK_IN_PROGRESS\n");
-            fclose(metadata);
+      char metadata_path[PATH_MAX];
+      snprintf(metadata_path, sizeof(metadata_path),
+               "%s/files/test_same_blocks/v1/metadata.config",
+               TEST_MOUNT_POINT);
+      FILE *metadata = fopen(metadata_path, "w");
+      fprintf(metadata, "SIZE=200\nBLOCKS=[1,2]\nESTADO=WORK_IN_PROGRESS\n");
+      fclose(metadata);
 
-            // Cambiar a un tamaño que sigue necesitando 2 bloques
-            int result = truncate_file("test_same_blocks", "v1", 250, TEST_MOUNT_POINT, test_logger);
+      // Cambiar a un tamaño que sigue necesitando 2 bloques
+      int result = truncate_file("test_same_blocks", "v1", 250,
+                                 TEST_MOUNT_POINT, test_logger);
 
-            should_int(result) be equal to(0);
+      should_int(result) be equal to(0);
 
-            // El resultado debería ser que no se modificó nada
-            char metadata_content[256];
-            read_file_contents(metadata_path, metadata_content, sizeof(metadata_content));
-            should_ptr(strstr(metadata_content, "BLOCKS=[1,2]")) not be null;
-        } end
-    } end
+      // El resultado debería ser que no se modificó nada
+      char metadata_content[256];
+      read_file_contents(metadata_path, metadata_content,
+                         sizeof(metadata_content));
+      should_ptr(strstr(metadata_content, "BLOCKS=[1,2]")) not be null;
+    }
+    end
+  }
+  end
+
+    describe("maybe_handle_orphaned_physical_block op") {
+    t_log *test_logger;
+
+    before {
+      create_test_directory();
+      test_logger = create_test_logger();
+      g_storage_logger = test_logger;
+
+      // Crear estructura básica del filesystem
+      create_test_superblock(TEST_MOUNT_POINT);
+      init_storage(TEST_MOUNT_POINT);
+    }
+    end
+
+        after {
+      destroy_test_logger(test_logger);
+      cleanup_test_directory();
+    }
+    end
+
+    it("libera bloque huérfano sin hard links correctamente") {
+      // Crear un bloque físico de prueba
+      char physical_block_path[PATH_MAX];
+      snprintf(physical_block_path, sizeof(physical_block_path),
+               "%s/physical_blocks/block0001.dat", TEST_MOUNT_POINT);
+
+      FILE *block_file = fopen(physical_block_path, "w");
+      fprintf(block_file, "test data");
+      fclose(block_file);
+
+      // Setear el bit en el bitmap (simular que está ocupado)
+      int block_index = 1;
+      int result_set = modify_bitmap_bits(TEST_MOUNT_POINT, &block_index, 1, 1);
+      should_int(result_set) be equal to(0);
+
+      int result = maybe_handle_orphaned_physical_block(
+          physical_block_path, TEST_MOUNT_POINT, 123, test_logger);
+
+      should_int(result) be equal to(0);
+
+      // Verificar que el bit se unseteó en el bitmap
+      char bitmap_path[PATH_MAX];
+      snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
+               TEST_MOUNT_POINT);
+
+      FILE *bitmap_file = fopen(bitmap_path, "rb");
+      size_t bitmap_size = get_bitmap_size_bytes(TEST_MOUNT_POINT);
+      unsigned char *bitmap_data = malloc(bitmap_size);
+      fread(bitmap_data, 1, bitmap_size, bitmap_file);
+      fclose(bitmap_file);
+
+      // El bit 1 debería estar en 0
+      should_int(bitmap_data[0] & 0x40) be equal to(0); // bit 1
+
+      free(bitmap_data);
+    }
+    end
+
+    it("no libera bloque con hard links") {
+      // Crear un bloque físico de prueba con hard link
+      char physical_block_path[PATH_MAX];
+      char hard_link_path[PATH_MAX];
+      snprintf(physical_block_path, sizeof(physical_block_path),
+               "%s/physical_blocks/block0002.dat", TEST_MOUNT_POINT);
+      snprintf(hard_link_path, sizeof(hard_link_path), "%s/test_hardlink.dat",
+               TEST_MOUNT_POINT);
+
+      FILE *block_file = fopen(physical_block_path, "w");
+      fprintf(block_file, "test data");
+      fclose(block_file);
+
+      // Crear hard link
+      link(physical_block_path, hard_link_path);
+
+      // Setear el bit en el bitmap
+      int block_index = 2;
+      int result_set = modify_bitmap_bits(TEST_MOUNT_POINT, &block_index, 1, 1);
+      should_int(result_set) be equal to(0);
+
+      // Llamar a la función
+      int result = maybe_handle_orphaned_physical_block(
+          physical_block_path, TEST_MOUNT_POINT, 456, test_logger);
+
+      should_int(result) be equal to(0);
+
+      // Verificar que el bit NO se unseteó en el bitmap
+      char bitmap_path[PATH_MAX];
+      snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
+               TEST_MOUNT_POINT);
+
+      FILE *bitmap_file = fopen(bitmap_path, "rb");
+      size_t bitmap_size = get_bitmap_size_bytes(TEST_MOUNT_POINT);
+      unsigned char *bitmap_data = malloc(bitmap_size);
+      fread(bitmap_data, 1, bitmap_size, bitmap_file);
+      fclose(bitmap_file);
+
+      // El bit 2 debería seguir en 1
+      should_int(bitmap_data[0] & 0x20) not be equal to(0); // bit 2
+
+      free(bitmap_data);
+      unlink(hard_link_path);
+    }
+    end
+
+    it("retorna error para archivo inexistente") {
+      char nonexistent_path[PATH_MAX];
+      snprintf(nonexistent_path, sizeof(nonexistent_path),
+               "%s/physical_blocks/block9999.dat", TEST_MOUNT_POINT);
+
+      int result = maybe_handle_orphaned_physical_block(
+          nonexistent_path, TEST_MOUNT_POINT, 789, test_logger);
+
+      should_int(result) be equal to(-1);
+    }
+    end
+
+    it("retorna error para nombre de bloque inválido") {
+      char invalid_path[PATH_MAX];
+      snprintf(invalid_path, sizeof(invalid_path),
+               "%s/physical_blocks/invalid_name.dat", TEST_MOUNT_POINT);
+
+      FILE *block_file = fopen(invalid_path, "w");
+      fprintf(block_file, "test data");
+      fclose(block_file);
+
+      int result = maybe_handle_orphaned_physical_block(
+          invalid_path, TEST_MOUNT_POINT, 101, test_logger);
+
+      should_int(result) be equal to(-2);
+    }
+    end
+
+    it("retorna error para superblock inexistente") {
+      char physical_block_path[PATH_MAX];
+      snprintf(physical_block_path, sizeof(physical_block_path),
+               "%s/physical_blocks/block0003.dat", TEST_MOUNT_POINT);
+
+      FILE *block_file = fopen(physical_block_path, "w");
+      fprintf(block_file, "test data");
+      fclose(block_file);
+
+      int result = maybe_handle_orphaned_physical_block(
+          physical_block_path, "/invalid/mount", 202, test_logger);
+
+      should_int(result) be equal to(-3);
+    }
+    end
+  }
+  end
 }

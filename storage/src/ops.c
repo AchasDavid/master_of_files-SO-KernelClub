@@ -73,7 +73,7 @@ int maybe_handle_orphaned_physical_block(const char *physical_block_path,
               physical_block_path);
     return -1;
   }
-  if (statbuf.st_nlink != 0) {
+  if (statbuf.st_nlink > 1) {
     log_info(logger,
              "El bloque físico %s todavía tiene %lu hard links, no se libera",
              physical_block_path, statbuf.st_nlink);
@@ -82,13 +82,24 @@ int maybe_handle_orphaned_physical_block(const char *physical_block_path,
 
   // Extraer el número de bloque del path
   int block_number;
-  if (sscanf(physical_block_path, "%*sblock%d.dat", &block_number) != 1) {
+
+  // Obtener solo el nombre del archivo
+  const char *filename = strrchr(physical_block_path, '/');
+  if (filename == NULL) {
+    filename =
+        physical_block_path; // Si no hay '/' el path completo es el filename
+  } else {
+    filename++; // Saltea el '/'
+  }
+
+  // Validar que el nombre del archivo siga el formato "blockXXXX.dat"
+  if (sscanf(filename, "block%d.dat", &block_number) != 1) {
     log_error(logger, "No se pudo parsear el número de bloque de %s",
               physical_block_path);
     return -2;
   }
 
-  // Unsetear el bit del bloque en el bitmap usando la función de utils
+  // Unsetear el bit del bloque en el bitmap
   int result = modify_bitmap_bits(mount_point, &block_number, 1, 0);
   if (result != 0) {
     log_error(logger, "No se pudo liberar el bloque %d en el bitmap",

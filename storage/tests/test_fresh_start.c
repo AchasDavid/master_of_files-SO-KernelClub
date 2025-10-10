@@ -1,4 +1,5 @@
 #include "../src/fresh_start/fresh_start.h"
+#include "../src/storage_utils.h"
 #include "test_utils.h"
 #include "globals/globals.h"
 #include <commons/bitarray.h>
@@ -94,6 +95,8 @@ context(test_storage_filesystem) {
 
         describe("funcion init_bitmap") {
             it("crea bitmap.bin con inicializacion correcta") {
+                create_test_superblock(TEST_MOUNT_POINT);
+
                 int result = init_bitmap(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE);
 
                 should_int(result) be equal to(0);

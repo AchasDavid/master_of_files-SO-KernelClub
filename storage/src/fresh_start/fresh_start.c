@@ -8,7 +8,6 @@
  * @return 0 en caso de exito, -1 si se rompe
  */
 int wipe_storage_content(const char *mount_point) {
-  // First check if directory exists
   struct stat st;
   if (stat(mount_point, &st) != 0 || !S_ISDIR(st.st_mode)) {
     log_error(g_storage_logger,
