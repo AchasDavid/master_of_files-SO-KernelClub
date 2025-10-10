@@ -53,6 +53,8 @@ typedef struct worker_table {
  */
 int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *master);
 
+int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_master *master);
+
 /**
  * @brief Crea un nuevo Worker Control Block (WCB) y lo inicializa.
  * 

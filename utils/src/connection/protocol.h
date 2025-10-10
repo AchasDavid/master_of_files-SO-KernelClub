@@ -9,6 +9,9 @@ typedef enum {
     OP_QUERY_FILE_PATH,
     OP_WORKER_HANDSHAKE,
     OP_WORKER_ACK,
+    OP_WORKER_START_QUERY,
+    OP_WORKER_READ_MESSAGE_REQ,
+    QC_OP_READ_DATA,
 } t_master_op_code;
 
 typedef enum {

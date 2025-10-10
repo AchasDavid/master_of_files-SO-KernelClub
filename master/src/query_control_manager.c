@@ -74,11 +74,12 @@ int generate_query_id(t_master *master) {
     return ++(master->queries_table->next_query_id);
 }
 
-t_query_control_block *create_query(t_query_table *table, int query_id, char *query_file_path, int priority, int assigned_worker_id) {
+t_query_control_block *create_query(t_query_table *table, int query_id, char *query_file_path, int priority, int socket_fd) {
     // loqueamos la tabla para manipular datos administrativos
     pthread_mutex_lock(&table->query_table_mutex);
 
     t_query_control_block *qcb = malloc(sizeof(t_query_control_block));
+    qcb->socket_fd = socket_fd;
     qcb->query_id = query_id;
     qcb->query_file_path = strdup(query_file_path);
     qcb->priority = priority;

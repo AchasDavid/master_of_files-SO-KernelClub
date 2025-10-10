@@ -26,6 +26,7 @@ typedef enum {
 } t_query_state;
 
 typedef struct {
+    int socket_fd;
     int query_id;
     char *query_file_path;
     int priority;
