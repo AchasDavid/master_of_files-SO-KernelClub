@@ -161,13 +161,18 @@ int truncate_file(const char *name, const char *tag, const int new_size_bytes,
       snprintf(target_path, sizeof(target_path),
                "%s/files/%s/%s/logical_blocks/%d.bin", mount_point, name, tag,
                i);
-      snprintf(resolved_path, sizeof(resolved_path), "%s",
-               realpath(target_path, NULL));
 
       if (access(target_path, F_OK) != 0) {
         log_info(logger, "Bloque lógico %d no existía en %s", i, target_path);
         continue;
       }
+
+      if (realpath(target_path, resolved_path) == NULL) {
+        log_error(logger, "No se pudo resolver el path %s", target_path);
+        retval = -3;
+        goto clean_new_blocks;
+      }
+
       if (remove(target_path) != 0) {
         log_error(logger, "No se pudo eliminar el bloque lógico %d en %s", i,
                   target_path);
