@@ -207,32 +207,24 @@ int main(int argc, char* argv[])
             free(contenido);
         } break;
 
-        case QC_OP_MASTER_FIN: {
-            // Motivo int8 -> Porque finalizo la ejecucion de query
-            //Motivos :
-            /*
-            1 -> Error
-            2 -> Prioridad y 3 -> Desconexion ? 
-            O serian 2 OP_CODE separados : QC_OP_MASTER_FIN_DESCONEXION y QC_OP_MASTER_FIN_PRIORIDAD?
-            */
-            uint8_t motivo = 1;
-            if (!package_read_uint8(resp, &motivo)) {
-                // Abstraccion de errores
+        case QC_OP_MASTER_FIN_DESCONEXION:
+        case QC_OP_MASTER_FIN_PRIORIDAD: {
+
+            if (!resp) {
                 retval = fail_pkg(logger, "Paquete FIN inválido", &resp, -7);
                 goto clean_socket;
             }
-            const char* motivoString = (motivo==1) ? "ERROR" : "DESCONEXION";
+
+            const char* motivoString =
+            (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "PRIORIDAD";
+
             log_info(logger, "## Query Finalizada - %s", motivoString);
 
-            package_destroy(resp);
-            retval = 0;               
-            goto clean_socket;        
+            package_destroy(resp); resp = NULL;
+            retval = 0;
+            goto clean_socket;
         } break;
-
-        /*case OP_QUERY_FILE_PATH:
-            // Mensaje?
-            break;
-         */
+        
         default:
             log_warning(logger, "Error al recibir respuesta, opcode %u desconocido", resp->operation_code);
             retval = fail_pkg(logger, "", &resp, -7);
