@@ -17,7 +17,7 @@ obj/
 !.vscode/c_cpp_properties.json
 !.vscode/launch.json
 !.vscode/settings.json
-!.vscode/tasks.
+!.vscode/tasks.json
 
 # Valgrind files
 vgcore.*

@@ -132,6 +132,7 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
 
     // Liberar memoria
     package_destroy(package_to_query);
+    free(msg);
     return 0;
 }
 
