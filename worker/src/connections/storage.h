@@ -26,6 +26,16 @@ int get_block_size(int storage_socket, uint16_t *block_size);
 
 int create_file_in_storage(int storage_socket, char *file, char *tag);
 int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t size);
+
+/**
+ * Realiza un fork (instrucción TAG) de un archivo en el Storage.
+ * @param storage_socket El socket de la conexión con el Storage.
+ * @param file_src El nombre del archivo fuente.
+ * @param tag_src Tag del archivo fuente.
+ * @param file_dst El nombre del archivo destino.
+ * @param tag_dst Tag del archivo destino.
+ * @return 0 si la operación fue exitosa, -1 en caso de error.
+ */
 int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst);
 int commit_file_in_storage(int storage_socket, char *file, char *tag);
 int delete_file_in_storage(int storage_socket, char *file, char *tag);
