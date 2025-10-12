@@ -6,8 +6,9 @@
 #ifndef QUERY_CONTROL_MANAGER_H
 #define QUERY_CONTROL_MANAGER_H
 
-#include <utils/serialization.h>
-#include <utils/protocol.h>
+#include <connection/protocol.h>
+#include <connection/serialization.h>
+#include <commons/log.h>
 #include <pthread.h>
 #include <commons/log.h>
 
@@ -49,19 +50,7 @@ typedef struct query_table {
     pthread_mutex_t query_table_mutex;
 } t_query_table;
 
-/**
- * @brief Maneja la recepción y el procesamiento de la ruta de archivo de consulta y su prioridad desde un cliente.
- *
- * Esta función lee una cadena del búfer proporcionado, que contiene la ruta del archivo de consulta y su prioridad,
- * separadas por el delimitador 0x1F. Analiza la ruta y la prioridad, envía una respuesta de confirmación al cliente,
- * registra la información recibida y prepara el manejo posterior de la ejecución de la consulta.
- *
- * @param buffer Puntero al bufer que contiene los datos entrantes.
- * @param client_socket Descriptor de socket para el cliente conectado.
- * @param master Puntero a la estructura principal del Master para acceder a la configuración y el logger.
- * @return 0 en caso de éxito, negativo en caso de error.
- */
-int manage_query_file_path(t_buffer *buffer, int client_socket, t_master *master);
+int manage_query_file_path(t_package *response_package, int client_socket, t_master *master);
 
 /**
  * @brief Genera y devuelve un ID único y secuencial para una nueva query.
@@ -75,17 +64,6 @@ int manage_query_file_path(t_buffer *buffer, int client_socket, t_master *master
  */
 int generate_query_id(t_master *master);
 
-/**
- * @brief Maneja el proceso de handshake inicial con un cliente de control de consultas.
- *
- * Esta función envía un ID asignado (actualmente hardcodeado) al cliente para completar el proceso de handshake.
- * Registra cualquier error que ocurra durante el envío del ID.
- *
- * @param buffer Puntero al bufer que contiene los datos entrantes.
- * @param client_socket Descriptor de socket para el cliente conectado.
- * @param logger Pointer al logger para registrar eventos y errores.
- * @return 0 en caso de éxito, negativo en caso de error.
- */
-int manage_query_handshake(t_buffer *buffer, int client_socket, t_log *logger);
+int manage_query_handshake(int client_socket, t_log *logger);
 
 #endif

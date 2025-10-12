@@ -8,6 +8,8 @@
 
 #include <pthread.h>
 #include <commons/log.h>
+#include <connection/serialization.h>
+#include <connection/protocol.h>
 
 typedef struct master t_master;
 
@@ -37,4 +39,15 @@ typedef struct worker_table {
     pthread_mutex_t worker_table_mutex;
 } t_worker_table;
 
+/**
+ * @brief Maneja el handshake inicial con un Worker.
+ * 
+ * @param buffer Buffer que contiene los datos del handshake.
+ * @param client_socket Socket del cliente (Worker).
+ * @param master Puntero a la estructura del Master.
+ * @return int 0 si el handshake fue exitoso, -1 en caso de error.
+ * 
+ * TODO: Implementar almacenamiento del ID del Worker en la tabla de workers para luego planificar.
+ */
+int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *master);
 #endif
