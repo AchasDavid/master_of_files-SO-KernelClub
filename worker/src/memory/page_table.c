@@ -67,7 +67,7 @@ void pt_mark_dirty(page_table_t *page_table, uint32_t page_number)
 
     pt_entry_t *entry = &page_table->entries[page_number];
     entry->dirty = true;
-    entry->page_number = page_number; // 🔹 asegurar consistencia
+    entry->page_number = page_number;
 }
 
 void pt_mark_clean(page_table_t *page_table, uint32_t page_number)
@@ -127,7 +127,7 @@ pt_entry_t *pt_get_dirty_entries(page_table_t *page_table, size_t *count)
         if (page_table->entries[i].dirty)
         {
             dirty_entries[index] = page_table->entries[i];
-            dirty_entries[index].page_number = i; // 🔹 importante si no lo tiene seteado
+            dirty_entries[index].page_number = i;
             index++;
         }
     }

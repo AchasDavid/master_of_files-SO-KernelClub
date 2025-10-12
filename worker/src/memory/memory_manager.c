@@ -71,7 +71,7 @@ page_table_t *mm_get_or_create_page_table(memory_manager_t *mm, char *file, char
     file_tag_entry_t *new_entry = &mm->entries[mm->count++];
     new_entry->file = strdup(file);
     new_entry->tag = strdup(tag);
-    new_entry->page_table = pt_create(mm->count, mm->page_size);
+    new_entry->page_table = pt_create(1, mm->page_size);
     if (!new_entry->file || !new_entry->tag || !new_entry->page_table)
     {
         free(new_entry->file);
