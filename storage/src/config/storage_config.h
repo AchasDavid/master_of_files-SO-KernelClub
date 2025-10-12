@@ -2,21 +2,13 @@
 #define STORAGE_CONFIG_H
 
 #include <commons/config.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
-
-typedef struct {
-    char* storage_ip;
-    char* storage_port;
-    char* fresh_start;
-    char* module_path;
-    char* operation_delay;
-    char* block_access_delay;
-    char* log_level;
-} t_storage_config;
+#include "globals/globals.h"
 
 /**
  * Crea la configuración del Storage y la devuelve
