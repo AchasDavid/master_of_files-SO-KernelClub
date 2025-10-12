@@ -160,7 +160,7 @@ void* handle_client(void* arg) {
                 break;
             
             // Worker
-            case OP_WORKER_HANDSHAKE:
+            case OP_WORKER_HANDSHAKE_REQ:
                 log_debug(master->logger, "Recibido OP_WORKER_HANDSHAKE de socket %d", client_socket);
                 if (manage_worker_handshake(required_package->buffer, client_socket, master) == 0) {
                     log_info(master->logger, "Handshake completado con worker en socket %d", client_socket);
