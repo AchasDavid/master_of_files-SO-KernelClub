@@ -29,6 +29,7 @@ void mm_destroy(memory_manager_t *mm)
         pt_destroy(entry->page_table);
     }
     free(mm->entries);
+    free(mm->physical_memory);
     free(mm);
 }
 
