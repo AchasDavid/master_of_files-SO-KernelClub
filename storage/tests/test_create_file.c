@@ -52,7 +52,7 @@ context(test_create_file) {
 
     snprintf(target_path, sizeof(target_path),
              "%s/files/test_file/v1/logical_blocks", TEST_MOUNT_POINT);
-    should_bool(directory_exists(logical_blocks_dir)) be truthy;
+    should_bool(directory_exists(target_path)) be truthy;
 
     // Verificar archivo de metadata
     snprintf(target_path, sizeof(target_path),
