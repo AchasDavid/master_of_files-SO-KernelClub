@@ -1,4 +1,5 @@
 #include "operations/create_file.h"
+#include "utils/filesystem_utils.h"
 #include <limits.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -6,43 +7,20 @@
 
 int _create_file(uint32_t query_id, const char *name, const char *tag,
                  const char *mount_point) {
-  char target_path[PATH_MAX];
 
-  // Crear carpeta del File
-  snprintf(target_path, sizeof(target_path), "%s/files/%s", mount_point, name);
-  mkdir(target_path, 0755); // Ignoramos el error si ya existe
-
-  // Crear carpeta del Tag
-  snprintf(target_path, sizeof(target_path), "%s/files/%s/%s", mount_point,
-           name, tag);
-  if (mkdir(target_path, 0755) != 0)
-    goto file_creation_error;
-
-  // Crear carpeta de bloques lógicos
-  snprintf(target_path, sizeof(target_path), "%s/files/%s/%s/logical_blocks",
-           mount_point, name, tag);
-  if (mkdir(target_path, 0755) != 0)
-    goto file_creation_error;
-
-  // Crear archivo de metadata
-  snprintf(target_path, sizeof(target_path), "%s/files/%s/%s/metadata.config",
-           mount_point, name, tag);
-  FILE *metadata_ptr = fopen(target_path, "w");
-  if (metadata_ptr == NULL) {
-    log_error(g_storage_logger, "No se pudo crear el archivo %s", target_path);
-    return -2;
+  if (create_file_dir_structure(mount_point, name, tag) != 0) {
+    log_error(g_storage_logger, "Error al crear el archivo %s con tag %s", name,
+              tag);
+    return -1;
   }
 
-  fprintf(metadata_ptr, "SIZE=0\nBLOCKS=[]\nESTADO=WORK_IN_PROGRESS\n");
-  fclose(metadata_ptr);
+  if (create_metadata_file(mount_point, name, tag, NULL) != 0) {
+    return -2;
+  }
 
   log_info(g_storage_logger, "## %u - File Creado: %s:%s", query_id, name, tag);
 
   return 0;
-
-file_creation_error:
-  log_error(g_storage_logger, "Error al crear el archivo %s con tag %s", name, tag);
-  return -1;
 }
 
 t_package *create_file(t_package *package) {
@@ -63,8 +41,8 @@ t_package *create_file(t_package *package) {
     return NULL;
   }
 
-  int operation_result = _create_file(
-      query_id, name, tag, g_storage_config->mount_point);
+  int operation_result =
+      _create_file(query_id, name, tag, g_storage_config->mount_point);
 
   free(name);
   free(tag);

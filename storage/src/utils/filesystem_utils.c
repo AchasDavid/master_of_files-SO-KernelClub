@@ -1,0 +1,62 @@
+#include "filesystem_utils.h"
+#include "../globals/globals.h"
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <utils/logger.h>
+
+int create_dir_recursive(const char *path) {
+  char command[PATH_MAX + 20];
+  snprintf(command, sizeof(command), "mkdir -p \"%s\"", path);
+
+  if (system(command) != 0) {
+    log_error(g_storage_logger, "No se pudo crear la carpeta %s", path);
+    return -1;
+  }
+  return 0;
+}
+
+int create_file_dir_structure(const char *mount_point, const char *file_name,
+                              const char *tag) {
+  char tag_path[PATH_MAX];
+  char path_buffer[PATH_MAX];
+  struct stat st;
+
+  // Verificar si el tag ya existe
+  snprintf(tag_path, sizeof(tag_path), "%s/files/%s/%s", mount_point, file_name,
+           tag);
+  if (stat(tag_path, &st) == 0) {
+    log_error(g_storage_logger, "El tag %s ya existe para el archivo %s", tag,
+              file_name);
+    return -1;
+  }
+
+  snprintf(path_buffer, sizeof(path_buffer), "%s/files/%s/%s/logical_blocks",
+           mount_point, file_name, tag);
+
+  return create_dir_recursive(path_buffer);
+}
+
+int create_metadata_file(const char *mount_point, const char *file_name,
+                         const char *tag, const char *initial_content) {
+  char metadata_path[PATH_MAX];
+
+  snprintf(metadata_path, sizeof(metadata_path),
+           "%s/files/%s/%s/metadata.config", mount_point, file_name, tag);
+
+  FILE *metadata_ptr = fopen(metadata_path, "w");
+  if (metadata_ptr == NULL) {
+    log_error(g_storage_logger, "No se pudo crear el archivo %s",
+              metadata_path);
+    return -1;
+  }
+
+  const char *content = initial_content
+                            ? initial_content
+                            : "SIZE=0\nBLOCKS=[]\nESTADO=WORK_IN_PROGRESS\n";
+  fprintf(metadata_ptr, "%s", content);
+  fclose(metadata_ptr);
+
+  return 0;
+}
