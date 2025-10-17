@@ -31,6 +31,18 @@ int create_file_dir_structure(const char *mount_point, const char *file_name,
                               const char *tag);
 
 /**
+ * Elimina toda la estructura de carpetas para un archivo con tag
+ * Elimina recursivamente: mount_point/files/file_name/tag/
+ *
+ * @param mount_point Path de la carpeta donde está montado el filesystem
+ * @param file_name Nombre del archivo
+ * @param tag Tag del archivo a eliminar
+ * @return 0 en caso de éxito, -1 si falla
+ */
+int delete_file_dir_structure(const char *mount_point, const char *file_name,
+                              const char *tag);
+
+/**
  * Crea un archivo metadata.config con contenido inicial
  *
  * @param mount_point Path de la carpeta donde está montado el filesystem

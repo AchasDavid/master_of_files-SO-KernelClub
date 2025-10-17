@@ -19,23 +19,38 @@ int create_dir_recursive(const char *path) {
 
 int create_file_dir_structure(const char *mount_point, const char *file_name,
                               const char *tag) {
-  char tag_path[PATH_MAX];
-  char path_buffer[PATH_MAX];
+  char target_path[PATH_MAX];
   struct stat st;
 
-  // Verificar si el tag ya existe
-  snprintf(tag_path, sizeof(tag_path), "%s/files/%s/%s", mount_point, file_name,
-           tag);
-  if (stat(tag_path, &st) == 0) {
+  snprintf(target_path, sizeof(target_path), "%s/files/%s/%s", mount_point,
+           file_name, tag);
+  if (stat(target_path, &st) == 0) {
     log_error(g_storage_logger, "El tag %s ya existe para el archivo %s", tag,
               file_name);
     return -1;
   }
 
-  snprintf(path_buffer, sizeof(path_buffer), "%s/files/%s/%s/logical_blocks",
+  snprintf(target_path, sizeof(target_path), "%s/files/%s/%s/logical_blocks",
            mount_point, file_name, tag);
 
-  return create_dir_recursive(path_buffer);
+  return create_dir_recursive(target_path);
+}
+
+int delete_file_dir_structure(const char *mount_point, const char *file_name,
+                              const char *tag) {
+  char target_path[PATH_MAX];
+  snprintf(target_path, sizeof(target_path), "%s/files/%s/%s", mount_point,
+           file_name, tag);
+
+  char command[PATH_MAX + 20];
+  snprintf(command, sizeof(command), "rm -rf \"%s\"", target_path);
+  if (system(command) != 0) {
+    log_error(g_storage_logger, "No se pudo eliminar la carpeta %s",
+              target_path);
+    return -1;
+  }
+
+  return 0;
 }
 
 int create_metadata_file(const char *mount_point, const char *file_name,

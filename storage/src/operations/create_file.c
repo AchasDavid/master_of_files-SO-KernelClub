@@ -15,6 +15,11 @@ int _create_file(uint32_t query_id, const char *name, const char *tag,
   }
 
   if (create_metadata_file(mount_point, name, tag, NULL) != 0) {
+    log_error(g_storage_logger,
+              "Error al crear el metadata del archivo %s con tag %s", name,
+              tag);
+    delete_file_dir_structure(mount_point, name, tag);
+
     return -2;
   }
 
@@ -54,7 +59,7 @@ t_package *create_file(t_package *package) {
     return NULL;
   }
 
-  if (!package_add_uint8(response, operation_result)) {
+  if (!package_add_uint8(response, (uint8_t)operation_result)) {
     log_error(g_storage_logger,
               "## Error al escribir status en respuesta de CREATE_FILE");
     package_destroy(response);
