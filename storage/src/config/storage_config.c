@@ -84,7 +84,6 @@ cleanup:
 
 clean_config:
     config_destroy(config);
-
     return NULL;
 }
 
