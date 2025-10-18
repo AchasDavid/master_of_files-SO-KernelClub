@@ -1,4 +1,5 @@
 #include "filesystem_utils.h"
+#include "../errors.h"
 #include "../globals/globals.h"
 #include <limits.h>
 #include <stdio.h>
@@ -25,9 +26,11 @@ int create_file_dir_structure(const char *mount_point, const char *file_name,
   snprintf(target_path, sizeof(target_path), "%s/files/%s/%s", mount_point,
            file_name, tag);
   if (stat(target_path, &st) == 0) {
-    log_error(g_storage_logger, "El tag %s ya existe para el archivo %s", tag,
-              file_name);
-    return -1;
+    log_error(g_storage_logger,
+              "El tag %s ya existe para el archivo %s, reportando "
+              "FILE_TAG_ALREADY_EXISTS",
+              tag, file_name);
+    return FILE_TAG_ALREADY_EXISTS;
   }
 
   snprintf(target_path, sizeof(target_path), "%s/files/%s/%s/logical_blocks",
@@ -41,6 +44,13 @@ int delete_file_dir_structure(const char *mount_point, const char *file_name,
   char target_path[PATH_MAX];
   snprintf(target_path, sizeof(target_path), "%s/files/%s/%s", mount_point,
            file_name, tag);
+
+  if (stat(target_path, &(struct stat){0}) != 0) {
+    log_warning(g_storage_logger,
+                "La carpeta %s no existe, reportando FILE_TAG_MISSING",
+                target_path);
+    return FILE_TAG_MISSING;
+  }
 
   char command[PATH_MAX + 20];
   snprintf(command, sizeof(command), "rm -rf \"%s\"", target_path);

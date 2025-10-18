@@ -1,6 +1,7 @@
 #include "../src/fresh_start/fresh_start.h"
 #include "../src/globals/globals.h"
 #include "../src/operations/create_file.h"
+#include "../src/errors.h"
 #include "test_utils.h"
 #include <commons/config.h>
 #include <cspecs/cspec.h>
@@ -67,13 +68,13 @@ context(test_create_file) {
   }
   end
 
-            it("retorna error si ya existe la carpeta del archivo con el mismo tag") {
+            it("retorna FILE_TAG_ALREADY_EXISTS si ya existe la carpeta del archivo con el mismo tag") {
     _create_file(0, "existing_file", "existing_tag", TEST_MOUNT_POINT);
 
     int result =
         _create_file(0, "existing_file", "existing_tag", TEST_MOUNT_POINT);
 
-    should_int(result) be equal to(-1);
+    should_int(result) be equal to(FILE_TAG_ALREADY_EXISTS);
   }
   end
 

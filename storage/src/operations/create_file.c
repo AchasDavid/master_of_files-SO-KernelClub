@@ -8,10 +8,11 @@
 int _create_file(uint32_t query_id, const char *name, const char *tag,
                  const char *mount_point) {
 
-  if (create_file_dir_structure(mount_point, name, tag) != 0) {
+  int result = create_file_dir_structure(mount_point, name, tag);
+  if (result != 0) {
     log_error(g_storage_logger, "Error al crear el archivo %s con tag %s", name,
               tag);
-    return -1;
+    return result;
   }
 
   if (create_metadata_file(mount_point, name, tag, NULL) != 0) {
