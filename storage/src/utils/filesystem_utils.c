@@ -42,10 +42,11 @@ int create_file_dir_structure(const char *mount_point, const char *file_name,
 int delete_file_dir_structure(const char *mount_point, const char *file_name,
                               const char *tag) {
   char target_path[PATH_MAX];
+  struct stat st;
   snprintf(target_path, sizeof(target_path), "%s/files/%s/%s", mount_point,
            file_name, tag);
 
-  if (stat(target_path, &(struct stat){0}) != 0) {
+  if (stat(target_path, &st) != 0) {
     log_warning(g_storage_logger,
                 "La carpeta %s no existe, reportando FILE_TAG_MISSING",
                 target_path);
