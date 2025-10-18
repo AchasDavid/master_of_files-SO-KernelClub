@@ -19,8 +19,6 @@
 
 #define MODULO "STORAGE"
 #define DEFAULT_CONFIG_PATH "./storage.config"
-#define CONST_FS_SIZE 4096
-#define CONST_BLOCK_SIZE 128
 
 
 int main(int argc, char *argv[]) {
