@@ -64,7 +64,7 @@ int maybe_handle_orphaned_physical_block(const char *physical_block_path,
 }
 
 int truncate_file(uint32_t query_id, const char *name, const char *tag,
-                   int new_size_bytes, const char *mount_point) {
+                  int new_size_bytes, const char *mount_point) {
   int retval = 0;
 
   char storage_config_path[PATH_MAX];

@@ -2,6 +2,7 @@
 #include "../src/fresh_start/fresh_start.h"
 #include "../src/globals/globals.h"
 #include "../src/operations/create_file.h"
+#include "../src/operations/truncate_file.h"
 #include "../src/utils/filesystem_utils.h"
 #include "test_utils.h"
 #include <cspecs/cspec.h>
@@ -11,13 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-
-// Declaraciones para funciones static que testeamos
-int truncate_file(uint32_t query_id, const char *name, const char *tag,
-                  int new_size_bytes, const char *mount_point);
-int maybe_handle_orphaned_physical_block(const char *physical_block_path,
-                                         const char *mount_point,
-                                         uint32_t query_id);
 
 context(test_ops) {
   describe("create_file op") {
