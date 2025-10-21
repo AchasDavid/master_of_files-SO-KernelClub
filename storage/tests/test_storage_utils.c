@@ -80,50 +80,6 @@ context(test_storage_utils) {
   }
   end
 
-    describe("get_bitmap_size_bytes function") {
-    t_log *test_logger;
-
-    before {
-      create_test_directory();
-      test_logger = create_test_logger();
-      g_storage_logger = test_logger;
-    }
-    end
-
-        after {
-      destroy_test_logger(test_logger);
-      cleanup_test_directory();
-    }
-    end
-
-    it("calcula correctamente el tamaño del bitmap") {
-      create_test_superblock(TEST_MOUNT_POINT);
-
-      size_t bitmap_size = get_bitmap_size_bytes(TEST_MOUNT_POINT);
-
-      // Con TEST_FS_SIZE=4096 y TEST_BLOCK_SIZE=128, necesitamos 32 bloques
-      // 32 bits = 4 bytes
-      size_t expected_size = (TEST_FS_SIZE / TEST_BLOCK_SIZE + 7) / 8;
-      should_int((int)bitmap_size) be equal to((int)expected_size);
-    }
-    end
-
-    it("retorna error para superblock inexistente") {
-      size_t bitmap_size = get_bitmap_size_bytes(TEST_MOUNT_POINT);
-
-      should_int((int)bitmap_size) be equal to(-1);
-    }
-    end
-
-    it("retorna error para path inexistente") {
-      size_t bitmap_size = get_bitmap_size_bytes("/path/inexistente");
-
-      should_int((int)bitmap_size) be equal to(-1);
-    }
-    end
-  }
-  end
-
     describe("modify_bitmap_bits function") {
     t_log *test_logger;
 
@@ -131,10 +87,21 @@ context(test_storage_utils) {
       create_test_directory();
       test_logger = create_test_logger();
       g_storage_logger = test_logger;
+
+      g_storage_config = malloc(sizeof(t_storage_config));
+      g_storage_config->mount_point = strdup(TEST_MOUNT_POINT);
+      g_storage_config->fs_size = TEST_FS_SIZE;
+      g_storage_config->block_size = TEST_BLOCK_SIZE;
+      int total_blocks =
+          g_storage_config->fs_size / g_storage_config->block_size;
+      g_storage_config->bitmap_size_bytes = (total_blocks + 7) / 8;
     }
     end
 
         after {
+      free(g_storage_config->mount_point);
+      free(g_storage_config);
+      g_storage_config = NULL;
       destroy_test_logger(test_logger);
       cleanup_test_directory();
     }
@@ -143,12 +110,11 @@ context(test_storage_utils) {
     it("setea bits correctamente") {
       create_test_superblock(TEST_MOUNT_POINT);
 
-      // Crear bitmap inicial con todos los bits en 0
       char bitmap_path[PATH_MAX];
       snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
                TEST_MOUNT_POINT);
 
-      size_t bitmap_size = get_bitmap_size_bytes(TEST_MOUNT_POINT);
+      size_t bitmap_size = g_storage_config->bitmap_size_bytes;
       unsigned char *bitmap_data = calloc(bitmap_size, 1);
 
       FILE *bitmap_file = fopen(bitmap_path, "wb");
@@ -180,7 +146,7 @@ context(test_storage_utils) {
       snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
                TEST_MOUNT_POINT);
 
-      size_t bitmap_size = get_bitmap_size_bytes(TEST_MOUNT_POINT);
+      size_t bitmap_size = g_storage_config->bitmap_size_bytes;
       unsigned char *bitmap_data = malloc(bitmap_size);
       memset(bitmap_data, 0xFF, bitmap_size);
 
@@ -206,13 +172,6 @@ context(test_storage_utils) {
     }
     end
 
-    it("retorna error para superblock inexistente") {
-      int result = modify_bitmap_bits(TEST_MOUNT_POINT, 0, 2, 1);
-
-      should_int(result) be equal to(-1);
-    }
-    end
-
     it("retorna error para bitmap inexistente") {
       create_test_superblock(TEST_MOUNT_POINT);
 
@@ -229,7 +188,7 @@ context(test_storage_utils) {
       snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin",
                TEST_MOUNT_POINT);
 
-      size_t bitmap_size = get_bitmap_size_bytes(TEST_MOUNT_POINT);
+      size_t bitmap_size = g_storage_config->bitmap_size_bytes;
       unsigned char *bitmap_data = calloc(bitmap_size, 1);
 
       FILE *bitmap_file = fopen(bitmap_path, "wb");

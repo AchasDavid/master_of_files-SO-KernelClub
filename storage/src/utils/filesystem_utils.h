@@ -66,14 +66,6 @@ int create_metadata_file(const char *mount_point, const char *file_name,
 int read_superblock(const char* mount_point, int* fs_size, int* block_size);
 
 /**
- * Calcula el tamaño en bytes necesario para el bitmap del filesystem
- *
- * @param mount_point Path de la carpeta donde está montado el filesystem
- * @return Tamaño en bytes del bitmap, -1 si hay error
- */
-size_t get_bitmap_size_bytes(const char* mount_point);
-
-/**
  * Modifica bits contiguos en el bitmap del filesystem
  *
  * @param mount_point Path de la carpeta donde está montado el filesystem

@@ -119,20 +119,6 @@ int read_superblock(const char *mount_point, int *fs_size, int *block_size) {
   return 0;
 }
 
-size_t get_bitmap_size_bytes(const char *mount_point) {
-  int fs_size, block_size;
-
-  if (read_superblock(mount_point, &fs_size, &block_size) != 0) {
-    return (size_t)-1;
-  }
-
-  int total_blocks = fs_size / block_size;
-  size_t bitmap_size_bytes =
-      (total_blocks + 7) / 8; // Redondear al próximo byte
-
-  return bitmap_size_bytes;
-}
-
 int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
                        int set_bits) {
   int retval = 0;
@@ -140,12 +126,7 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
   char *bitmap_buffer = NULL;
   t_bitarray *bitmap = NULL;
 
-  size_t bitmap_size_bytes = get_bitmap_size_bytes(mount_point);
-  if (bitmap_size_bytes == (size_t)-1) {
-    log_error(g_storage_logger, "No se pudo calcular el tamaño del bitmap");
-    retval = -1;
-    goto end;
-  }
+  size_t bitmap_size_bytes = g_storage_config->bitmap_size_bytes;
 
   char bitmap_path[PATH_MAX];
   snprintf(bitmap_path, sizeof(bitmap_path), "%s/bitmap.bin", mount_point);

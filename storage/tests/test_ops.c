@@ -115,8 +115,9 @@ context(test_ops) {
       g_storage_config->mount_point = strdup(TEST_MOUNT_POINT);
       g_storage_config->block_size = TEST_BLOCK_SIZE;
       g_storage_config->fs_size = TEST_FS_SIZE;
+      int total_blocks = g_storage_config->fs_size / g_storage_config->block_size;
+      g_storage_config->bitmap_size_bytes = (total_blocks + 7) / 8;
 
-      // Crear superblock.config y usar fresh start del storage
       create_test_superblock(TEST_MOUNT_POINT);
       init_storage(TEST_MOUNT_POINT);
     }
@@ -230,6 +231,8 @@ context(test_ops) {
       g_storage_config->mount_point = strdup(TEST_MOUNT_POINT);
       g_storage_config->block_size = TEST_BLOCK_SIZE;
       g_storage_config->fs_size = TEST_FS_SIZE;
+      int total_blocks = g_storage_config->fs_size / g_storage_config->block_size;
+      g_storage_config->bitmap_size_bytes = (total_blocks + 7) / 8;
 
       create_test_superblock(TEST_MOUNT_POINT);
       init_storage(TEST_MOUNT_POINT);
