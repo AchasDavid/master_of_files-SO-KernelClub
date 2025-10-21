@@ -263,7 +263,8 @@ void *query_executor_thread(void *arg)
             goto finish_query;
         }
 
-        char *op_instruction = string_split(raw_instruction, " ")[0];
+        char **tokens = string_split(raw_instruction, " ");
+        char *op_instruction = tokens[0];
 
         log_info(state->logger, "## Query %d: FETCH - Program Counter: %d - %s", ctx.query_id, ctx.program_counter, op_instruction);
 
@@ -292,10 +293,12 @@ void *query_executor_thread(void *arg)
         if (exec_res < 0)
         {
             log_error(state->logger, "## Query %d: Falló la instrucción - %s", ctx.query_id, op_instruction);
+            string_array_destroy(tokens);
             free(raw_instruction);
             goto finish_query;
         }
         log_info(state->logger, "## Query %d: Instrucción realizada: %s", ctx.query_id, raw_instruction);
+        string_array_destroy(tokens);
         free(raw_instruction);
 
         pthread_mutex_lock(&state->mux);
