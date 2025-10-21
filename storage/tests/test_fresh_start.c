@@ -177,8 +177,8 @@ context(test_storage_filesystem) {
 
                 // Verificar que existen los archivos del primer y ultimo bloque con tamaño correcto
                 char first_block[PATH_MAX], last_block[PATH_MAX];
-                snprintf(first_block, sizeof(first_block), "%s/block0000.dat", physical_blocks_dir);
-                snprintf(last_block, sizeof(last_block), "%s/block%04d.dat", physical_blocks_dir, total_blocks - 1);
+                snprintf(first_block, sizeof(first_block), "%s/0000.dat", physical_blocks_dir);
+                snprintf(last_block, sizeof(last_block), "%s/%04d.dat", physical_blocks_dir, total_blocks - 1);
 
                 should_bool(file_exists(first_block)) be truthy;
                 should_bool(file_exists(last_block)) be truthy;
@@ -230,8 +230,8 @@ context(test_storage_filesystem) {
 
                 // Verificar hardlink
                 char physical_block[PATH_MAX], logical_block[PATH_MAX];
-                snprintf(physical_block, sizeof(physical_block), "%s/physical_blocks/block0000.dat", TEST_MOUNT_POINT);
-                snprintf(logical_block, sizeof(logical_block), "%s/files/initial_file/BASE/logical_blocks/block0000.dat", TEST_MOUNT_POINT);
+                snprintf(physical_block, sizeof(physical_block), "%s/physical_blocks/0000.dat", TEST_MOUNT_POINT);
+                snprintf(logical_block, sizeof(logical_block), "%s/files/initial_file/BASE/logical_blocks/0000.dat", TEST_MOUNT_POINT);
 
                 should_int(files_are_hardlinked(physical_block, logical_block)) be equal to(1);
             } end

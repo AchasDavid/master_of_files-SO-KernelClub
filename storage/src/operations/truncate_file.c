@@ -17,7 +17,7 @@ int delete_logical_block(const char *mount_point, const char *name,
                          int physical_block_index, uint32_t query_id) {
   char target_path[PATH_MAX];
   snprintf(target_path, sizeof(target_path),
-           "%s/files/%s/%s/logical_blocks/%d.dat", mount_point, name, tag,
+           "%s/files/%s/%s/logical_blocks/%04d.dat", mount_point, name, tag,
            logical_block_index);
 
   if (remove(target_path) != 0) {
@@ -105,7 +105,8 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
         continue;
       }
 
-      delete_logical_block(mount_point, name, tag, i, atoi(old_blocks[i]), query_id);
+      delete_logical_block(mount_point, name, tag, i, atoi(old_blocks[i]),
+                           query_id);
     }
 
     for (int i = 0; i < new_block_count; i++) {
@@ -115,7 +116,7 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
     // Expandir (asignar nuevos bloques)
     char physical_block_zero_path[PATH_MAX];
     snprintf(physical_block_zero_path, sizeof(physical_block_zero_path),
-             "%s/physical_blocks/block0000.dat", mount_point);
+             "%s/physical_blocks/0000.dat", mount_point);
 
     for (int i = old_block_count; i < new_block_count; i++) {
       snprintf(target_path, sizeof(target_path),
