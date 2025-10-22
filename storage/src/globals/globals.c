@@ -1,7 +1,7 @@
 #include "globals.h"
 
-t_storage_config* g_storage_config;
-t_log* g_storage_logger;
+t_storage_config *g_storage_config;
+t_log *g_storage_logger;
 int g_worker_counter = 0;
 t_dictionary *g_open_files_dict = NULL;
 
