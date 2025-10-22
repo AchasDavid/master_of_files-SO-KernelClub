@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 typedef enum {
     CLOCK,
@@ -25,6 +26,7 @@ typedef struct {
     size_t page_size;
     pt_replacement_t policy;
     void *physical_memory;
+    int memory_retardation;
 } memory_manager_t;
 
 memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement_t policy);

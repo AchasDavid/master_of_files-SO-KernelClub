@@ -130,14 +130,16 @@ int mm_write_to_memory(memory_manager_t *mm,
                        void *data,
                        size_t size)
 {
+    if (!mm || !page_table || !data || size == 0)
+        return -1;
+    
     uint32_t page_size = mm->page_size;
     uint32_t current_page = base_address / page_size;
     uint32_t offset = base_address % page_size;
     size_t bytes_remaining = size;
     const uint8_t *data_ptr = data;
 
-    if (!mm || !page_table || !data || size == 0)
-        return -1;
+    usleep(mm->memory_retardation * 1000);
 
     while (bytes_remaining > 0)
     {
@@ -185,6 +187,8 @@ int mm_read_from_memory(memory_manager_t *mm,
     uint32_t offset = base_address % page_size;
     size_t bytes_remaining = size;
     uint8_t *out_ptr = out_buffer;
+
+    usleep(mm->memory_retardation * 1000);
 
     while (bytes_remaining > 0)
     {
