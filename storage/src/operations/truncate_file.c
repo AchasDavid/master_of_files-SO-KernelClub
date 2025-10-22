@@ -1,4 +1,5 @@
 #include "truncate_file.h"
+#include "../file_locks.h"
 #include "../utils/filesystem_utils.h"
 #include "globals/globals.h"
 #include <commons/config.h>
@@ -67,6 +68,8 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
                   int new_size_bytes, const char *mount_point) {
   int retval = 0;
 
+  lock_file(name, tag);
+
   char metadata_path[PATH_MAX];
   snprintf(metadata_path, sizeof(metadata_path),
            "%s/files/%s/%s/metadata.config", mount_point, name, tag);
@@ -74,7 +77,8 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
   if (!metadata_config) {
     log_error(g_storage_logger, "No se pudo abrir el config: %s",
               metadata_path);
-    return -1;
+    retval = -1;
+    goto unlock_only;
   }
 
   char **old_blocks = config_get_array_value(metadata_config, "BLOCKS");
@@ -86,7 +90,7 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
     log_info(g_storage_logger,
              "El nuevo tamaño encaja en la misma cantidad de bloques, "
              "no se requiere truncado.");
-    goto clean_metadata_and_blocks;
+    goto clean_metadata_and_old_blocks;
   }
 
   char **new_blocks = string_array_new();
@@ -126,7 +130,7 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
         log_error(g_storage_logger, "No se pudo crear hard link de %s a %s",
                   physical_block_zero_path, target_path);
         retval = -2;
-        goto clean_new_blocks;
+        goto clean_all;
       }
     }
 
@@ -151,13 +155,15 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
 
   free(stringified_blocks);
 
-clean_new_blocks:
+clean_all:
   if (new_blocks)
     string_array_destroy(new_blocks);
-clean_metadata_and_blocks:
+clean_metadata_and_old_blocks:
   if (old_blocks)
     string_array_destroy(old_blocks);
   config_destroy(metadata_config);
+unlock_only:
+  unlock_file(name, tag);
   return retval;
 }
 

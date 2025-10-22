@@ -115,8 +115,11 @@ context(test_ops) {
       g_storage_config->mount_point = strdup(TEST_MOUNT_POINT);
       g_storage_config->block_size = TEST_BLOCK_SIZE;
       g_storage_config->fs_size = TEST_FS_SIZE;
-      int total_blocks = g_storage_config->fs_size / g_storage_config->block_size;
+      int total_blocks =
+          g_storage_config->fs_size / g_storage_config->block_size;
       g_storage_config->bitmap_size_bytes = (total_blocks + 7) / 8;
+
+      g_open_files_dict = dictionary_create();
 
       create_test_superblock(TEST_MOUNT_POINT);
       init_storage(TEST_MOUNT_POINT);
@@ -124,6 +127,10 @@ context(test_ops) {
     end
 
         after {
+      if (g_open_files_dict) {
+        dictionary_destroy(g_open_files_dict);
+        g_open_files_dict = NULL;
+      }
       free(g_storage_config->mount_point);
       free(g_storage_config);
       g_storage_config = NULL;
@@ -231,8 +238,11 @@ context(test_ops) {
       g_storage_config->mount_point = strdup(TEST_MOUNT_POINT);
       g_storage_config->block_size = TEST_BLOCK_SIZE;
       g_storage_config->fs_size = TEST_FS_SIZE;
-      int total_blocks = g_storage_config->fs_size / g_storage_config->block_size;
+      int total_blocks =
+          g_storage_config->fs_size / g_storage_config->block_size;
       g_storage_config->bitmap_size_bytes = (total_blocks + 7) / 8;
+
+      g_open_files_dict = dictionary_create();
 
       create_test_superblock(TEST_MOUNT_POINT);
       init_storage(TEST_MOUNT_POINT);
@@ -240,6 +250,10 @@ context(test_ops) {
     end
 
         after {
+      if (g_open_files_dict) {
+        dictionary_destroy(g_open_files_dict);
+        g_open_files_dict = NULL;
+      }
       free(g_storage_config->mount_point);
       free(g_storage_config);
       g_storage_config = NULL;

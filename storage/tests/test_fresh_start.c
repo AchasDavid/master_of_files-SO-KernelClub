@@ -1,7 +1,7 @@
 #include "../src/fresh_start/fresh_start.h"
 #include "../src/utils/filesystem_utils.h"
-#include "test_utils.h"
 #include "globals/globals.h"
+#include "test_utils.h"
 #include <commons/bitarray.h>
 #include <commons/config.h>
 #include <cspecs/cspec.h>
