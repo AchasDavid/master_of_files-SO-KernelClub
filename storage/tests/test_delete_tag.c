@@ -22,12 +22,29 @@ context(test_delete_tag) {
       test_logger = create_test_logger();
       g_storage_logger = test_logger;
 
+      g_storage_config = malloc(sizeof(t_storage_config));
+      g_storage_config->mount_point = strdup(TEST_MOUNT_POINT);
+      g_storage_config->block_size = TEST_BLOCK_SIZE;
+      g_storage_config->fs_size = TEST_FS_SIZE;
+      int total_blocks =
+          g_storage_config->fs_size / g_storage_config->block_size;
+      g_storage_config->bitmap_size_bytes = (total_blocks + 7) / 8;
+
+      g_open_files_dict = dictionary_create();
+
       create_test_superblock(TEST_MOUNT_POINT);
       init_storage(TEST_MOUNT_POINT);
     }
     end
 
         after {
+      if (g_open_files_dict) {
+        dictionary_destroy(g_open_files_dict);
+        g_open_files_dict = NULL;
+      }
+      free(g_storage_config->mount_point);
+      free(g_storage_config);
+      g_storage_config = NULL;
       destroy_test_logger(test_logger);
       cleanup_test_directory();
     }
@@ -56,7 +73,7 @@ context(test_delete_tag) {
     it("retorna error al intentar eliminar initial_file:BASE") {
       int result = delete_tag(11, "initial_file", "BASE", TEST_MOUNT_POINT);
 
-      should_int(result) be equal to(-2);
+      should_int(result) be equal to(-1);
 
       char tag_dir[PATH_MAX];
       snprintf(tag_dir, sizeof(tag_dir), "%s/files/initial_file/BASE",

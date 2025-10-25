@@ -1,5 +1,6 @@
 #include "delete_tag.h"
 #include "errors.h"
+#include "file_locks.h"
 #include "utils/filesystem_utils.h"
 #include <string.h>
 
@@ -12,8 +13,10 @@ int delete_tag(uint32_t query_id, const char *name, const char *tag,
                 "## %u - No se puede eliminar initial_file:BASE, es un archivo "
                 "protegido",
                 query_id);
-    return -2;
+    return -1;
   }
+
+  lock_file(name, tag);
 
   t_file_metadata *metadata = read_file_metadata(mount_point, name, tag);
   if (!metadata) {
@@ -21,31 +24,38 @@ int delete_tag(uint32_t query_id, const char *name, const char *tag,
                 "## %u - No se pudo leer el metadata para %s:%s, "
                 "reportando FILE_TAG_MISSING",
                 query_id, name, tag);
-    return FILE_TAG_MISSING;
+    retval = FILE_TAG_MISSING;
+    goto end;
+  }
+
+  for (int i = 0; i < metadata->block_count; i++) {
+    int physical_block_index = metadata->blocks[i];
+
+    if (delete_logical_block(mount_point, name, tag, i, physical_block_index,
+                             query_id) != 0) {
+      log_error(g_storage_logger,
+                "## %u - Error al eliminar el bloque lógico %04d de %s:%s",
+                query_id, i, name, tag);
+      retval = -2;
+      goto clean_metadata;
+    }
   }
 
   if (delete_file_dir_structure(mount_point, name, tag) != 0) {
     log_error(g_storage_logger, "No se pudo eliminar la carpeta %s/%s", name,
               tag);
-    retval = -1;
-    goto end;
-  }
-
-  for (int i = 0; i < metadata->block_count; i++) {
-    int block_number = metadata->blocks[i];
-    char physical_block_path[PATH_MAX];
-    snprintf(physical_block_path, sizeof(physical_block_path),
-             "%s/physical_blocks/block%04d.dat", mount_point, block_number);
-
-    maybe_handle_orphaned_physical_block(physical_block_path, mount_point,
-                                         query_id);
+    retval = -3;
+    goto clean_metadata;
   }
 
   log_info(g_storage_logger, "## %u - Tag Eliminado %s:%s", query_id, name,
            tag);
 
-end:
+clean_metadata:
   destroy_file_metadata(metadata);
+end:
+  unlock_file(name, tag);
+
   return retval;
 }
 
