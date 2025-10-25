@@ -16,8 +16,9 @@
  * @param mount_point Path de la carpeta donde está montado el filesystem
  * @return 0 en caso de éxito,
  *         FILE_TAG_MISSING si el tag no existe,
- *         -1 si falla la eliminación,
- *         -2 si se intenta eliminar un archivo protegido
+ *         -1 si se intenta eliminar un archivo protegido,
+ *         -2 si falla la eliminación de bloques lógicos,
+ *         -3 si falla la eliminación de la estructura de carpetas
  */
 int delete_tag(uint32_t query_id, const char *name, const char *tag,
                const char *mount_point);
