@@ -22,14 +22,15 @@ int delete_logical_block(const char *mount_point, const char *name,
            logical_block_index);
 
   if (remove(target_path) != 0) {
-    log_error(g_storage_logger, "No se pudo eliminar el bloque lógico %d en %s",
+    log_error(g_storage_logger,
+              "No se pudo eliminar el bloque lógico %04d en %s",
               logical_block_index, target_path);
     return -1;
   }
 
   log_info(g_storage_logger,
            "##%u - Bloque Lógico Eliminado - Nombre: %s, Tag: %s, "
-           "Índice: %d",
+           "Índice: %04d",
            query_id, name, tag, logical_block_index);
 
   snprintf(target_path, sizeof(target_path), "%s/physical_blocks/block%04d.dat",
@@ -38,7 +39,7 @@ int delete_logical_block(const char *mount_point, const char *name,
   struct stat statbuf;
   if (stat(target_path, &statbuf) != 0) {
     log_error(g_storage_logger,
-              "No se pudo obtener el estado del bloque lógico %d en %s",
+              "No se pudo obtener el estado del bloque lógico %04d en %s",
               logical_block_index, target_path);
     return -2;
   }
@@ -52,13 +53,13 @@ int delete_logical_block(const char *mount_point, const char *name,
 
   if (modify_bitmap_bits(mount_point, physical_block_index, 1, 0) != 0) {
     log_error(g_storage_logger,
-              "No se pudo liberar el bloque físico %d en el bitmap",
+              "No se pudo liberar el bloque físico %04d en el bitmap",
               physical_block_index);
     return -3;
   }
 
   log_info(g_storage_logger,
-           "##%u - Bloque Físico Liberado - Número de Bloque: %d", query_id,
+           "##%u - Bloque Físico Liberado - Número de Bloque: %04d", query_id,
            physical_block_index);
 
   return 0;
@@ -100,11 +101,11 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
     // Truncar (liberar bloques sobrantes)
     for (int i = new_block_count; i < old_block_count; i++) {
       snprintf(target_path, sizeof(target_path),
-               "%s/files/%s/%s/logical_blocks/%d.dat", mount_point, name, tag,
+               "%s/files/%s/%s/logical_blocks/%04d.dat", mount_point, name, tag,
                i);
 
       if (access(target_path, F_OK) != 0) {
-        log_info(g_storage_logger, "Bloque lógico %d no existía en %s", i,
+        log_info(g_storage_logger, "Bloque lógico %04d no existía en %s", i,
                  target_path);
         continue;
       }
