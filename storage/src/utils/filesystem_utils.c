@@ -129,6 +129,11 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
   char *bitmap_buffer = NULL;
   t_bitarray *bitmap = NULL;
 
+  if (!g_storage_config) {
+    log_error(g_storage_logger, "g_storage_config es NULL");
+    return -4;
+  }
+
   size_t bitmap_size_bytes = g_storage_config->bitmap_size_bytes;
 
   char bitmap_path[PATH_MAX];
@@ -146,7 +151,7 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
   if (!bitmap_buffer) {
     log_error(g_storage_logger, "No se pudo asignar memoria para el bitmap");
     retval = -2;
-    goto clean_file;
+    goto clean_bitmap;
   }
 
   pthread_mutex_lock(&g_storage_bitmap_mutex);
@@ -155,7 +160,7 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
       bitmap_size_bytes) {
     log_error(g_storage_logger, "No se pudo leer el bitmap completo");
     retval = -1;
-    goto clean_buffer;
+    goto unlock_mutex;
   }
 
   bitmap =
@@ -163,7 +168,7 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
   if (!bitmap) {
     log_error(g_storage_logger, "No se pudo crear el bitmap en memoria");
     retval = -2;
-    goto clean_buffer;
+    goto unlock_mutex;
   }
 
   for (size_t i = 0; i < count; i++) {
@@ -178,26 +183,20 @@ int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
 
   int written_bytes = fwrite(bitmap_buffer, 1, bitmap_size_bytes, bitmap_file);
 
-  pthread_mutex_unlock(&g_storage_bitmap_mutex);
-
   if (written_bytes != bitmap_size_bytes) {
     log_error(g_storage_logger, "No se pudo escribir el bitmap modificado");
     retval = -3;
-    goto clean_bitmap;
+  } else {
+    log_info(g_storage_logger, "Modificados %zu bits en el bitmap (%s)", count,
+             set_bits ? "seteados" : "unseteados");
   }
 
-  log_info(g_storage_logger, "Modificados %zu bits en el bitmap (%s)", count,
-           set_bits ? "seteados" : "unseteados");
-
+  bitarray_destroy(bitmap);
+unlock_mutex:
+  pthread_mutex_unlock(&g_storage_bitmap_mutex);
 clean_bitmap:
-  if (bitmap)
-    bitarray_destroy(bitmap);
-clean_buffer:
-  if (bitmap_buffer)
-    free(bitmap_buffer);
-clean_file:
-  if (bitmap_file)
-    fclose(bitmap_file);
+  free(bitmap_buffer);
+  fclose(bitmap_file);
 end:
   return retval;
 }
@@ -319,4 +318,56 @@ void destroy_file_metadata(t_file_metadata *metadata) {
     config_destroy(metadata->config);
 
   free(metadata);
+}
+
+int delete_logical_block(const char *mount_point, const char *name,
+                         const char *tag, int logical_block_index,
+                         int physical_block_index, uint32_t query_id) {
+  char target_path[PATH_MAX];
+  snprintf(target_path, sizeof(target_path),
+           "%s/files/%s/%s/logical_blocks/%04d.dat", mount_point, name, tag,
+           logical_block_index);
+
+  if (remove(target_path) != 0) {
+    log_error(g_storage_logger,
+              "No se pudo eliminar el bloque lógico %04d en %s",
+              logical_block_index, target_path);
+    return -1;
+  }
+
+  log_info(g_storage_logger,
+           "##%u - Bloque Lógico Eliminado - Nombre: %s, Tag: %s, "
+           "Índice: %04d",
+           query_id, name, tag, logical_block_index);
+
+  snprintf(target_path, sizeof(target_path), "%s/physical_blocks/block%04d.dat",
+           mount_point, physical_block_index);
+
+  struct stat statbuf;
+  if (stat(target_path, &statbuf) != 0) {
+    log_error(g_storage_logger,
+              "No se pudo obtener el estado del bloque físico %04d en %s",
+              physical_block_index, target_path);
+    return -2;
+  }
+
+  if (statbuf.st_nlink != 1) {
+    log_info(g_storage_logger,
+             "El bloque físico %04d todavía tiene %lu hard links, no se libera",
+             physical_block_index, statbuf.st_nlink);
+    return 0;
+  }
+
+  if (modify_bitmap_bits(mount_point, physical_block_index, 1, 0) != 0) {
+    log_error(g_storage_logger,
+              "No se pudo liberar el bloque físico %04d en el bitmap",
+              physical_block_index);
+    return -3;
+  }
+
+  log_info(g_storage_logger,
+           "##%u - Bloque Físico Liberado - Número de Bloque: %04d", query_id,
+           physical_block_index);
+
+  return 0;
 }

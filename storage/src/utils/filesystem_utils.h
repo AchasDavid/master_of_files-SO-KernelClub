@@ -77,7 +77,7 @@ int read_superblock(const char *mount_point, int *fs_size, int *block_size);
  * @param set_bits 1 para setear bits (marcar como ocupados), 0 para unsetear
  * (marcar como libres)
  * @return 0 en caso de éxito, -1 si hay error abriendo bitmap, -2 si hay error
- * de memoria, -3 si hay error escribiendo
+ * de memoria, -3 si hay error escribiendo, -4 si g_storage_config es NULL
  */
 int modify_bitmap_bits(const char *mount_point, int start_index, size_t count,
                        int set_bits);
@@ -119,5 +119,24 @@ int save_file_metadata(t_file_metadata *metadata);
  * @param metadata Struct a liberar (puede ser NULL)
  */
 void destroy_file_metadata(t_file_metadata *metadata);
+
+/**
+ * Elimina un bloque lógico y libera el bloque físico asociado si ya no es
+ * referenciado
+ *
+ * @param mount_point Path de la carpeta donde está montado el filesystem
+ * @param name Nombre del archivo
+ * @param tag Tag del archivo
+ * @param logical_block_index Índice del bloque lógico a eliminar
+ * @param physical_block_index Índice del bloque físico asociado
+ * @param query_id ID de la query para logging
+ * @return 0 en caso de éxito, valores negativos en caso de error
+ *         -1: Error al eliminar el bloque lógico
+ *         -2: Error al obtener estado del bloque físico
+ *         -3: Error al liberar el bloque en el bitmap
+ */
+int delete_logical_block(const char *mount_point, const char *name,
+                         const char *tag, int logical_block_index,
+                         int physical_block_index, uint32_t query_id);
 
 #endif
