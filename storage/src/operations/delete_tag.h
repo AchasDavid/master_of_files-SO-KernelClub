@@ -5,6 +5,7 @@
 #include "connection/serialization.h"
 #include "globals/globals.h"
 #include "server/server.h"
+#include "utils/filesystem_utils.h"
 #include <stdint.h>
 
 /**

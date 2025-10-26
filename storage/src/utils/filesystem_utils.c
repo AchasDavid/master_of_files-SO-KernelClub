@@ -12,7 +12,7 @@
 #include <utils/logger.h>
 #include <utils/utils.h>
 
-int create_dir_recursive(const char *path) {
+filesystemint create_dir_recursive(const char *path) {
   char command[PATH_MAX + 20];
   snprintf(command, sizeof(command), "mkdir -p \"%s\"", path);
 
@@ -245,6 +245,7 @@ t_file_metadata *read_file_metadata(const char *mount_point,
     if (!metadata->blocks) {
       log_error(g_storage_logger,
                 "No se pudo asignar memoria para el array de bloques");
+      string_array_destroy(blocks_str);
       free(metadata->state);
       free(metadata);
       config_destroy(config);
@@ -259,6 +260,7 @@ t_file_metadata *read_file_metadata(const char *mount_point,
   }
 
   metadata->config = config;
+  string_array_destroy(blocks_str);
 
   log_info(g_storage_logger,
            "Metadata leído: %s:%s - SIZE=%d, BLOCKS=%d, ESTADO=%s", filename,
