@@ -1,7 +1,6 @@
 #include "delete_tag.h"
 #include "errors.h"
 #include "file_locks.h"
-#include "utils/filesystem_utils.h"
 #include <string.h>
 
 int delete_tag(uint32_t query_id, const char *name, const char *tag,
@@ -73,8 +72,10 @@ t_package *handle_delete_tag_op_package(t_package *package) {
   if (!name || !tag) {
     log_error(g_storage_logger,
               "## Error al deserializar parámetros de DELETE_TAG");
-    free(name);
-    free(tag);
+    if (name)
+      free(name);
+    if (tag)
+      free(tag);
     return NULL;
   }
 
