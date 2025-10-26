@@ -6,6 +6,10 @@ t_package *write_block(t_package *package) {
     char *tag = NULL;
     uint32_t block_number;
     char *block_content = NULL;
+    
+    t_bitarray *bitmap = NULL;
+    char *bitmap_buffer = NULL;
+    
     t_package *retval = NULL;
 
     if (validate_deserialization(package, &query_id, &name, &tag, &block_number, &block_content) < 0) {
@@ -37,10 +41,10 @@ t_package *write_block(t_package *package) {
     }
 
     char logical_block_path[PATH_MAX];
-    if(!logical_block_exists(name, tag, block_number, logical_block_path))
+    if(!logical_block_exists(name, tag, block_number, logical_block_path, sizeof(logical_block_path)))
     {
       log_error(g_storage_logger, "## Query ID: %d - El bloque lógico %d no existe en %s:%s.", query_id, block_number, name, tag);
-      retval = prepare_error_response(query_id, STORAGE_OP_BLOCK_WRITE_RES, OP_OUT_OF_BOUNDS);
+      retval = prepare_error_response(query_id, STORAGE_OP_BLOCK_WRITE_RES, READ_OUT_OF_BOUNDS);
       goto cleanup_metadata;
     }
 
@@ -55,13 +59,11 @@ t_package *write_block(t_package *package) {
       
       pthread_mutex_lock(&g_storage_bitmap_mutex);
 
-      t_bitarray *bitmap = NULL;
-      char *bitmap_buffer = NULL;
-      if(bitmap_load(&bitmap, &bitmap_buffer) < 0)
+      if(bitmap_load(bitmap, bitmap_buffer) < 0)
       {
         log_error(g_storage_logger, "# Query ID: %d - Fallo al cargar el bitmap.", query_id);
         retval = NULL;
-        goto cleanup_bitmap_mutex;
+        goto cleanup_metadata;
       }
 
       ssize_t bit_index = get_free_bit_index(bitmap);
@@ -81,17 +83,16 @@ t_package *write_block(t_package *package) {
       }
 
       free(bitmap_buffer);  
-      destroy_bitmap();
+      bitarray_destroy(bitmap);
       pthread_mutex_unlock(&g_storage_bitmap_mutex);
 
-      char physical_block_path[PATH_MAX];
-      if(create_new_hardlink(query_id, logical_block_path, bit_index, physical_block_path) < 0)
+      if(create_new_hardlink(query_id, logical_block_path, bit_index) < 0)
       {
         retval = NULL;
         goto cleanup_metadata;
       }
       
-      metadata->blocks[block_number] = (uint32_t)physical_block;
+      metadata->blocks[block_number] = (uint32_t)bit_index;
       if(save_file_metadata(metadata) < 0) {
         log_error(g_storage_logger, "## No se pudo guardar el metadata de %s:%s después de actualizar bloques.", name, tag);
         retval = NULL;
@@ -120,13 +121,12 @@ t_package *write_block(t_package *package) {
 
 cleanup_bitmap:
   free(bitmap_buffer);  
-  destroy_bitmap();
-cleanup_bitmap_mutex:
+  bitarray_destroy(bitmap);
   pthread_mutex_unlock(&g_storage_bitmap_mutex);
 cleanup_metadata:
   destroy_file_metadata(metadata);
 cleanup_unlock:
-  unlock(name, tag);
+  unlock_file(name, tag);
 cleanup_var:
   free(name);
   free(tag);
@@ -186,19 +186,18 @@ end:
   return retval;
 }
 
-int create_new_hardlink(uint32_t query_id, char *logical_block_path, ssize_t bit_index, char *physical_block_path) {
-    char new_physical_block_path[PATH_MAX];
-    snprintf(new_physical_block_path, sizeof(new_physical_block_path), "%s/physical_blocks/block%04zd.dat", g_storage_config->mount_point, bit_index);
-
-    if (!physical_block_exists((uint32_t)bit_index, physical_block_path))
+int create_new_hardlink(uint32_t query_id, char *logical_block_path, ssize_t bit_index) {
+    char physical_block_path[PATH_MAX];
+  
+    if (!physical_block_exists((uint32_t)bit_index, physical_block_path, sizeof(physical_block_path)))
     {
       log_error(g_storage_logger, "## Query ID: %d - El archivo %s no existe.", query_id, physical_block_path);
       return -1;
     }
 
-    if (link(new_physical_block_path, logical_block_path) != 0) 
+    if (link(physical_block_path, logical_block_path) != 0) 
     {
-      log_error(g_storage_logger, "## Query ID: %d - No se pudo crear el hard link de %s a %s.", query_id, new_physical_block_path, logical_block_path);
+      log_error(g_storage_logger, "## Query ID: %d - No se pudo crear el hard link de %s a %s.", query_id, physical_block_path, logical_block_path);
       return -1;
     }
 

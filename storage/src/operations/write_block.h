@@ -9,6 +9,7 @@
 #include "server/server.h"
 #include "utils/filesystem_utils.h"
 #include "file_locks.h"
+#include "errors.h"
 
 #define IN_PROGRESS "WORK_IN_PROGRESS"
 #define COMMITTED "COMMITTED"
@@ -42,10 +43,9 @@ int write_in_ph_block(uint32_t query_id, const char *logical_block_path, const c
  * @param query_id ID de la Query para logging.
  * @param logical_block_path Ruta donde se creará el nuevo hardlink lógico.
  * @param bit_index Índice del bit (número de bloque físico) asignado.
- * @param physical_block_path Puntero donde se almacenará la ruta al bloque físico.
  * @return int 0 si el hardlink se creó correctamente, -1 en caso de fallo.
  */
-int create_new_hardlink(uint32_t query_id, char *logical_block_path, ssize_t bit_index, char *physical_block_path);
+int create_new_hardlink(uint32_t query_id, char *logical_block_path, ssize_t bit_index);
 
 /**
  * Deserializa los datos necesarios para la operación WRITE BLOCK.
