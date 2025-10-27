@@ -18,7 +18,7 @@
  * @return 0 en caso de éxito,
  *         -1 si el tag destino ya existe,
  *         -2 si falla la operación de copia,
- *         -3 si no se puede leer la metadta después de copiar,
+ *         -3 si no se puede leer la metadata después de copiar,
  *         -4 si no se puede guardar la metadata actualizada
  */
 int create_tag(uint32_t query_id, const char *name, const char *src_tag,
