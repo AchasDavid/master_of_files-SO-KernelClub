@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     }
 
     char *config_file_path = argv[1];
-    char *worker_id = argv[2];
+    int worker_id = atoi(argv[2]);
 
     t_worker_config *worker_config = create_worker_config(config_file_path);
     if (worker_config == NULL)
@@ -38,10 +38,13 @@ int main(int argc, char *argv[])
     t_log *logger = logger_get();
     log_info(logger, "## Logger inicializado");
 
+    char worker_id_str[12];
+    sprintf(worker_id_str, "%d", worker_id);
+
     int client_socket_master =
         handshake_with_master(worker_config->master_ip,
                               worker_config->master_port,
-                              worker_id);
+                              worker_id_str);
     if (client_socket_master < 0)
     {
         goto clean;
@@ -57,7 +60,7 @@ int main(int argc, char *argv[])
     }
 
     uint16_t block_size;
-    if(get_block_size(client_socket_storage, &block_size)) 
+    if(get_block_size(client_socket_storage, &block_size, worker_id)) 
     {
        goto clean; 
     }
