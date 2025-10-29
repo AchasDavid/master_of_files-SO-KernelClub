@@ -14,7 +14,7 @@
 // --- Query por ID ---
 static int running_query_id_for_predicate = -1;
 
-static bool predicate_query_id_equals_running_id(void *elem) {
+static bool match_query_by_id(void *elem) {
     t_query_control_block *query = (t_query_control_block*)elem;
     return query && (query->query_id == running_query_id_for_predicate);
 }
@@ -140,12 +140,9 @@ int handle_worker_disconnection(int client_socket, t_master *master) {
             // En caso de fallo en bloqueo, igual marcamos en worker y continuamos con best-effort
         } else {
             // Buscar la QCB por ID (no por socket en este caso)
-            // Recorremos queries_table->query_list y comparamos query_id
-            t_query_control_block *qcb = NULL;
-
             // Predicate for list_find: es true cuando query id es igual a running_query_id en worker.
             running_query_id_for_predicate = running_query_id;
-            t_query_control_block *qcb = list_find(master->queries_table->query_list, predicate_query_id_equals_running_id);
+            t_query_control_block *qcb = list_find(master->queries_table->query_list, match_query_by_id);
 
             if (qcb) {
                 log_warning(master->logger, "[handle_worker_disconnection] Worker socket %d desconectado mientras realizaba la Query ID=%d (QC socket=%d)",
@@ -262,10 +259,85 @@ int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
     return 0;
 }
 
+
+/**
+ * handle_eviction_response:
+ *  - worker_socket: socket del worker que responde
+ *  - buffer: buffer recibido con la respuesta (estructura propia del paquete)
+ *  - master: contexto
+ *
+ * Se espera que el worker devuelva al menos el query_id y el pc/contexto (opcional).
+ * Aquí hacemos un best-effort: leemos query_id y movemos la query a EXIT y notificamos al QC.
+ */
+int handle_eviction_response(int worker_socket, t_buffer *buffer, t_master *master) {
+    if (!master || !master->queries_table) return -1;
+
+    log_info(master->logger, "[handle_eviction_response] Respuesta de desalojo recibida desde worker socket %d", worker_socket);
+
+    // Interpretamos el buffer (asumimos que el primer uint32 es query_id, luego opcionalmente program_counter)
+    buffer_reset_offset(buffer);
+    uint32_t qid, pc;
+
+    if (buffer_read_uint32(buffer, &qid)) {
+        log_warning(master->logger, "[handle_eviction_response] No se pudo leer query_id de la respuesta de desalojo. Búsqueda best-effort por socket del worker.");
+        // Si no podemos leer qid, buscaremos por worker->current_query_id
+        // Buscar worker por socket
+        if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
+            log_error(master->logger, "[handle_eviction_response] Error al bloquear worker_table_mutex");
+            return -1;
+        }
+        t_worker_control_block *wcb = find_worker_by_socket(master->workers_table, worker_socket);
+        if (!wcb) {
+            log_error(master->logger, "[handle_eviction_response] No se encontró worker para el socket %d", worker_socket);
+            pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
+            return -1;
+        }
+        qid = wcb->current_query_id;
+        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
+        if (qid <= 0) {
+            log_error(master->logger, "[handle_eviction_response] No se pudo determinar el id de query para la respuesta de desalojo desde socket %d", worker_socket);
+            return -1;
+        }
+    } else {
+        // opcional: leer program_counter si existe
+        if (buffer_read_uint32(buffer, &pc)) {
+            pc = -1; // si no existe, lo seteamos en -1 (error)
+        }
+    }
+
+    // Con qid determinado, buscar QCB y notificar QC
+    if (pthread_mutex_lock(&master->queries_table->query_table_mutex) != 0) {
+        log_error(master->logger, "[handle_eviction_response] Error al bloquear query_table_mutex");
+        return -1;
+    }
+
+    t_query_control_block *qcb = list_find(master->queries_table->query_list, match_query_by_id);
+
+    if (!qcb) {
+        log_error(master->logger, "[handle_eviction_response] Query ID=%u no encontrada en la tabla de queries", qid);
+        pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+        return -1;
+    }
+
+    // Actualizamos datos del qcb si recibimos pc u otro contexto (best-effort)
+    qcb->program_counter = pc;
+    qcb->state = QUERY_STATE_CANCELED;
+
+    // Notificar al Query Control que la query terminó por desalojo (o fue cancellada)
+    finalize_query_with_error(qcb, master, "Query evicted by master (worker responded)");
+
+    // Limpiar recursos asociados
+    cleanup_query_resources(qcb, master);
+
+    pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+
+    return 0;
+}
+
 void finalize_query_with_error(t_query_control_block *qcb, t_master *master, const char *error_reason) {
     if (!qcb || !master) return;
 
-    log_error(master->logger, "[finalize_query_with_error] Finalizing Query ID=%d with error: %s", qcb->query_id, error_reason ? error_reason : "Unknown reason");
+    log_error(master->logger, "[finalize_query_with_error] Finalizando Query ID=%d con error: %s", qcb->query_id, error_reason ? error_reason : "Razón desconocida");
 
     // Preparar paquete para notificar QC: uso de opcode QC_OP_MASTER_FIN_DESCONEXION
     t_package *pkg = package_create_empty(QC_OP_MASTER_FIN_DESCONEXION);
@@ -275,13 +347,13 @@ void finalize_query_with_error(t_query_control_block *qcb, t_master *master, con
         if (error_reason) package_add_string(pkg, error_reason);
 
         if (package_send(pkg, qcb->socket_fd) != 0) {
-            log_error(master->logger, "[finalize_query_with_error] Error sending finalization message to QC socket %d for Query ID=%d", qcb->socket_fd, qcb->query_id);
+            log_error(master->logger, "[finalize_query_with_error] Error al enviar mensaje de finalización al QC socket %d para Query ID=%d", qcb->socket_fd, qcb->query_id);
         } else {
-            log_info(master->logger, "[finalize_query_with_error] Sent finalization notification to QC socket %d for Query ID=%d", qcb->socket_fd, qcb->query_id);
+            log_info(master->logger, "[finalize_query_with_error] Notificación de finalización enviada al QC socket %d para Query ID=%d", qcb->socket_fd, qcb->query_id);
         }
         package_destroy(pkg);
     } else {
-        log_error(master->logger, "[finalize_query_with_error] Could not create package to notify QC for Query ID=%d", qcb->query_id);
+        log_error(master->logger, "[finalize_query_with_error] No se pudo crear paquete para notificar al QC para Query ID=%d", qcb->query_id);
     }
 
     qcb->state = QUERY_STATE_CANCELED;
@@ -319,7 +391,7 @@ void cleanup_query_resources(t_query_control_block *qcb, t_master *master) {
         }
     }
 
-    // Liberar campos dinámicos (si aplica)
+    // Liberar campos dinámicos
     if (qcb->query_file_path) {
         free(qcb->query_file_path);
         qcb->query_file_path = NULL;
