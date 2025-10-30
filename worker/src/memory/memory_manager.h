@@ -44,6 +44,7 @@ typedef struct
     int memory_retardation;
     int storage_socket;
     int worker_id;
+    int query_id;
 
     frame_table_t frame_table;
 } memory_manager_t;
