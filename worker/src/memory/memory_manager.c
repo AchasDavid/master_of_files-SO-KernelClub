@@ -1,5 +1,6 @@
 #include "memory_manager.h"
 #include "../connections/storage.h"
+#include <utils/logger.h>
 
 static void mm_resize_entries(memory_manager_t *mm)
 {
@@ -57,7 +58,7 @@ void mm_set_storage_connection(memory_manager_t *mm, int storage_socket, int wor
 {
     if (!mm)
         return;
-    
+
     mm->storage_socket = storage_socket;
     mm->worker_id = worker_id;
 }
@@ -157,16 +158,19 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     if (mm->storage_socket == -1 || mm->worker_id == -1)
         return -1;
 
+    log_info(logger_get(), "Query %d: - Memoria Miss - File: %s - Tag: %s - Pagina: %d",
+             mm->query_id, file, tag, page_number);
+
     int frame = mm_allocate_frame(mm);
     if (frame == -1)
         return -1;
 
     uint32_t block_number = page_number;
-    
+
     void *data = NULL;
     size_t size = 0;
     int result = read_block_from_storage(mm->storage_socket, file, tag, block_number, &data, &size, mm->worker_id);
-    
+
     if (result != 0 || !data)
     {
         mm_free_frame(mm, frame);
@@ -184,7 +188,7 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     memset(frame_addr, 0, mm->page_size);
     size_t copy_size = (size < mm->page_size) ? size : mm->page_size;
     memcpy(frame_addr, data, copy_size);
-    
+
     free(data);
 
     if (pt_map(pt, page_number, frame) != 0)
