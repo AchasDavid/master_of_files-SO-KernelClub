@@ -224,7 +224,7 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
                 return -1;
         }
 
-        void *frame_addr = mm_allocate_frame(mm, entry->frame);
+        void *frame_addr = mm_get_frame_address(mm, entry->frame);
         size_t bytes_to_copy = page_size - offset;
         if (bytes_to_copy > remaining)
             bytes_to_copy = remaining;
