@@ -167,6 +167,9 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     if (mm->storage_socket == -1 || mm->worker_id == -1)
         return -1;
 
+    log_info(logger_get(), "Query %d: - Memoria Miss - File: %s - Tag: %s - Pagina: %d",
+             mm->query_id, file, tag, page_number);
+
     int frame = mm_allocate_frame(mm);
     if (frame == -1)
         return -1;
@@ -202,6 +205,14 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
         mm_free_frame(mm, frame);
         return -1;
     }
+
+    log_info(logger_get(),
+             "## Query %d: Se asigna el Marco: %d a la Página: %d perteneciente al - File: %s - Tag: %s",
+             mm->query_id, frame, page_number, file, tag);
+
+    log_info(logger_get(),
+             "## Query %d: - Memoria Add - File: %s - Tag: %s - Pagina: %d - Marco: %d",
+             mm->query_id, file, tag, page_number, frame);
 
     return 0;
 }
