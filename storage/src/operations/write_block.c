@@ -34,6 +34,8 @@ t_package *handle_write_block_request(t_package *package) {
     return NULL;
   }
 
+  package_reset_read_offset(response);
+
   return response;
 }
 
