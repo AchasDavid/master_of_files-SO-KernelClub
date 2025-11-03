@@ -27,6 +27,8 @@ context(tests_write_block) {
             package_add_uint32(package, 21);
             package_add_string(package, "TEXTO");
 
+            package_reset_read_offset(package);
+
             int retval = deserialize_block_write_request(package, &query_id, &name, &tag, &block_number, &block_content);
             should_int(retval) be equal to (0);
 
@@ -192,9 +194,88 @@ context(tests_write_block) {
             int retval = execute_block_write("file1", "tag1", 12, 1, "CONTENIDO");
 
             should_int(retval) be equal to (NOT_ENOUGH_SPACE);
-            int lock_res = pthread_mutex_trylock(&g_storage_bitmap_mutex);
+            int lock_res = mutex_is_free(&g_storage_bitmap_mutex);
             should_int(lock_res) be equal to (0);
             should_bool(correct_unlock("file1", "tag1")) be truthy;
         } end
+
+        it ("Escritura en bloque exitosa") {
+            init_logical_blocks("file1", "tag1", 3, TEST_MOUNT_POINT);
+            create_test_metadata("file1", "tag1", 3, "[1,2,3]", "WORK_IN_PROGRESS", TEST_MOUNT_POINT);
+            init_bitmap(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE);
+
+            int retval = execute_block_write("file1", "tag1", 12, 1, "CONTENIDO");
+
+            should_int(retval) be equal to (0);
+            int lock_res = mutex_is_free(&g_storage_bitmap_mutex);
+            should_int(lock_res) be equal to (0);
+            should_bool(correct_unlock("file1", "tag1")) be truthy;
+        } end
+    } end
+
+    describe ("Lógica que maneja la solicitud de escritura en bloque") {
+        before {
+            g_storage_logger = create_test_logger();
+            create_test_directory();
+            create_test_storage_config("9090", "99", "false", TEST_MOUNT_POINT, 1000, 1000, "INFO");
+            create_test_superblock(TEST_MOUNT_POINT);
+
+            char config_path[PATH_MAX];
+            snprintf(config_path, sizeof(config_path), "%s/storage.config", TEST_MOUNT_POINT);
+            g_storage_config = create_storage_config(config_path);
+
+            g_open_files_dict = dictionary_create();
+            init_physical_blocks(TEST_MOUNT_POINT, g_storage_config->fs_size, g_storage_config->block_size);
+        } end
+
+        after {
+            cleanup_file_sync();
+            destroy_storage_config(g_storage_config);
+            cleanup_test_directory();
+            destroy_test_logger(g_storage_logger);
+        } end
+
+        it ("El manejador falla y devuelve un paquete de respuesta con código de error") {
+            t_package *package = package_create_empty(STORAGE_OP_BLOCK_WRITE_REQ);
+            package_add_uint32(package, (uint32_t)12);
+            package_add_string(package, "file1");
+            package_add_string(package, "tag1");
+            package_add_uint32(package, (uint32_t)3);
+            package_add_string(package, "CONTENIDO");
+            package_reset_read_offset(package);
+
+            t_package *response = handle_write_block_request(package);
+
+            should_int(response->operation_code) be equal to (STORAGE_OP_BLOCK_WRITE_RES);
+            int8_t err_code;
+            package_read_int8(response, &err_code);
+            should_int(err_code) be equal to (FILE_TAG_MISSING);
+            should_int(mutex_is_free(&g_storage_bitmap_mutex)) be equal to (0);
+            should_bool(correct_unlock("file1", "tag1")) be truthy;
+        } end
+
+        it ("Se maneja la escritura de bloque exitosamente y se devuelve un paquete de respuesta con código 0") {
+            init_logical_blocks("file1", "tag1", 3, TEST_MOUNT_POINT);
+            create_test_metadata("file1", "tag1", 3, "[1,2,3]", "WORK_IN_PROGRESS", TEST_MOUNT_POINT);
+            init_bitmap(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE);
+
+            t_package *package = package_create_empty(STORAGE_OP_BLOCK_WRITE_REQ);
+            package_add_uint32(package, (uint32_t)12);
+            package_add_string(package, "file1");
+            package_add_string(package, "tag1");
+            package_add_uint32(package, (uint32_t)2);
+            package_add_string(package, "CONTENIDO");
+            package_reset_read_offset(package);
+
+            t_package *response = handle_write_block_request(package);
+
+            should_int(response->operation_code) be equal to (STORAGE_OP_BLOCK_WRITE_RES);
+            int8_t success_code;
+            package_read_int8(response, &success_code);
+            should_int(success_code) be equal to (0);
+            should_int(mutex_is_free(&g_storage_bitmap_mutex)) be equal to (0);
+            should_bool(correct_unlock("file1", "tag1")) be truthy;
+        } end
+
     } end
 } 
