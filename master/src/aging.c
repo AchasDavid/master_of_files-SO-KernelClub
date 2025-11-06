@@ -129,11 +129,6 @@ unlock_and_exit:
 int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
     if (!qcb || !master) return -1;
 
-    if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
-        log_error(master->logger, "[preempt_query_in_exec] No se pudo lockear workers_table");
-        return -1;
-    }
-
     search_worker_id = qcb->assigned_worker_id;
     t_worker_control_block *worker = list_find(
         master->workers_table->worker_list,

@@ -90,6 +90,7 @@ error:
 void destroy_master(t_master *master) {
     // TODO: Verificar si es necesario liberar las listas dentro de las tablas
     if (master != NULL) {
+        int priority_algorithm = strcmp(master->scheduling_algorithm, "PRIORITY");
         if (master->ip != NULL) free(master->ip);
         if (master->scheduling_algorithm != NULL) free(master->scheduling_algorithm);
         if (master->workers_table != NULL) {
@@ -98,7 +99,7 @@ void destroy_master(t_master *master) {
         if (master->queries_table != NULL) {
             free(master->queries_table);
         }
-        if(strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
+        if(priority_algorithm == 0) {
             pthread_join(master->aging_thread, NULL);
             log_info(master->logger, "Aging thread finalizado correctamente.");
         }
