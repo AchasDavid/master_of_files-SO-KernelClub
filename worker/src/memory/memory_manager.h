@@ -69,4 +69,7 @@ bool mm_has_page_table(memory_manager_t *mm, char *file, char *tag);
 void mm_mark_all_clean(memory_manager_t *mm, char *file, char *tag);
 int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, char *tag, uint32_t page_number);
 
+int mm_find_lru_victim(memory_manager_t *mm);
+void mm_update_page_access(memory_manager_t *mm, page_table_t *pt, uint32_t page_number);
+
 #endif

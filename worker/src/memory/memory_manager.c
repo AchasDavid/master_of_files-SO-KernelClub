@@ -2,6 +2,8 @@
 #include "../connections/storage.h"
 #include <utils/logger.h>
 
+static uint64_t global_timestamp = 0;
+
 static void mm_resize_entries(memory_manager_t *mm)
 {
     if (mm->count < mm->capacity)
@@ -42,7 +44,6 @@ memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement
         return NULL;
     }
 
-    // Inicializamos la tabla de frames
     mm->frame_table.frame_count = memory_size / page_size;
     mm->frame_table.frames = calloc(mm->frame_table.frame_count, sizeof(frame_t));
     if (!mm->frame_table.frames)
@@ -206,6 +207,8 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
         return -1;
     }
 
+    mm_update_page_access(mm, pt, page_number);
+
     log_info(logger_get(),
              "## Query %d: Se asigna el Marco: %d a la Página: %d perteneciente al - File: %s - Tag: %s",
              mm->query_id, frame, page_number, file, tag);
@@ -244,6 +247,8 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
             if (mm_handle_page_fault(mm, pt, file, tag, current_page) != 0)
                 return -1;
         }
+
+        mm_update_page_access(mm, pt, current_page);
 
         void *frame_addr = mm_get_frame_address(mm, entry->frame);
         size_t bytes_to_copy = page_size - offset;
@@ -306,9 +311,20 @@ int mm_allocate_frame(memory_manager_t *mm)
         }
     }
 
-    // TODO: aplicar algoritmo de reemplazo (LRU / CLOCK-M)
     log_info(logger_get(), "## Query %d: - Memoria Llena - No hay marcos disponibles (Frame Count: %d)",
              mm->query_id, mm->frame_table.frame_count);
+    
+    if (mm->policy == LRU)
+    {
+        int victim_frame = mm_find_lru_victim(mm);
+        if (victim_frame != -1)
+        {
+            log_info(logger_get(), "## Query %d: Frame %d liberado usando algoritmo LRU",
+                    mm->query_id, victim_frame);
+            return victim_frame;
+        }
+    }
+    
     return -1;
 }
 
@@ -340,4 +356,61 @@ void mm_mark_all_clean(memory_manager_t *mm, char *file, char *tag)
     {
         pt_set_dirty(pt, i, false);
     }
+}
+
+void mm_update_page_access(memory_manager_t *mm, page_table_t *pt, uint32_t page_number)
+{
+    if (!mm || !pt || mm->policy != LRU)
+        return;
+    
+    pt_update_access_time(pt, page_number, ++global_timestamp);
+}
+
+int mm_find_lru_victim(memory_manager_t *mm)
+{
+    if (!mm || mm->policy != LRU)
+        return -1;
+    
+    uint64_t oldest_time = UINT64_MAX;
+    uint32_t victim_frame = -1;
+    char *victim_file = NULL;
+    char *victim_tag = NULL;
+    uint32_t victim_page = -1;
+    
+    for (uint32_t i = 0; i < mm->count; i++)
+    {
+        file_tag_entry_t *entry = &mm->entries[i];
+        page_table_t *pt = entry->page_table;
+        
+        for (uint32_t j = 0; j < pt->page_count; j++)
+        {
+            pt_entry_t *page_entry = &pt->entries[j];
+            if (page_entry->present && page_entry->last_access_time < oldest_time)
+            {
+                oldest_time = page_entry->last_access_time;
+                victim_frame = page_entry->frame;
+                victim_file = entry->file;
+                victim_tag = entry->tag;
+                victim_page = j;
+            }
+        }
+    }
+    
+    if (victim_frame != (uint32_t)-1)
+    {
+        log_info(logger_get(), 
+                "## Query %d: - Memoria Liberar - File: %s - Tag: %s - Pagina: %d - Marco: %d (LRU)",
+                mm->query_id, victim_file, victim_tag, victim_page, victim_frame);
+        
+        page_table_t *victim_pt = mm_find_page_table(mm, victim_file, victim_tag);
+        if (victim_pt && victim_pt->entries[victim_page].dirty)
+        {
+            log_info(logger_get(),
+                    "## Query %d: Página sucia siendo reemplazada - File: %s - Tag: %s - Pagina: %d",
+                    mm->query_id, victim_file, victim_tag, victim_page);
+        }
+        pt_unmap(victim_pt, victim_page);
+    }
+    
+    return victim_frame;
 }
