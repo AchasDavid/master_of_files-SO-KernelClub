@@ -61,16 +61,16 @@ context(tests_write_block) {
 
         it("Crea hardlink exitosamente") {
             char logical_block_path[PATH_MAX];
-            snprintf(logical_block_path, sizeof(logical_block_path), "%s/path.dat", TEST_MOUNT_POINT);
-            int retval = create_new_hardlink(12, logical_block_path, 2);
+            snprintf(logical_block_path, sizeof(logical_block_path), "%s/%04d.dat", TEST_MOUNT_POINT, 2);
+            int retval = create_new_hardlink(12, "file1", "tag1", 2, logical_block_path, 2);
 
             should_int(retval) be equal to (0);
         } end
 
         it("Index de bloque físico fuera de los límites") {
             char logical_block_path[PATH_MAX];
-            snprintf(logical_block_path, sizeof(logical_block_path), "%s/path.dat", TEST_MOUNT_POINT);
-            int retval = create_new_hardlink(12, logical_block_path, 80);
+            snprintf(logical_block_path, sizeof(logical_block_path), "%s/%04d.dat", TEST_MOUNT_POINT, 2);
+            int retval = create_new_hardlink(12, "file1", "tag1", 2, logical_block_path, 80);
 
             should_int(retval) be equal to (-1);
         } end
@@ -78,7 +78,7 @@ context(tests_write_block) {
         it("Error al crear el hardlink") {
             char logical_block_path[PATH_MAX];
             snprintf(logical_block_path, sizeof(logical_block_path), TEST_MOUNT_POINT);
-            int retval = create_new_hardlink(12, logical_block_path, 2);
+            int retval = create_new_hardlink(12, "file1", "tag1", 2, logical_block_path, 2);
 
             should_int(retval) be equal to (-1);
         } end
@@ -252,6 +252,8 @@ context(tests_write_block) {
             should_int(err_code) be equal to (FILE_TAG_MISSING);
             should_int(mutex_is_free(&g_storage_bitmap_mutex)) be equal to (0);
             should_bool(correct_unlock("file1", "tag1")) be truthy;
+            package_destroy(response);
+            package_destroy(package);
         } end
 
         it ("Se maneja la escritura de bloque exitosamente y se devuelve un paquete de respuesta con código 0") {
@@ -275,6 +277,8 @@ context(tests_write_block) {
             should_int(success_code) be equal to (0);
             should_int(mutex_is_free(&g_storage_bitmap_mutex)) be equal to (0);
             should_bool(correct_unlock("file1", "tag1")) be truthy;
+            package_destroy(response);
+            package_destroy(package);
         } end
 
     } end
