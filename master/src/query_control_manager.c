@@ -8,7 +8,7 @@
 #include <time.h>
 #include <stdint.h>
 
-// función auxiliar para manejar el aiging
+// función auxiliar para manejar el aging
 uint64_t now_ms_monotonic() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
