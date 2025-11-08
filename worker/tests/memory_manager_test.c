@@ -4,6 +4,31 @@
 #include <stdint.h>
 #include <string.h>
 #include <cspecs/cspec.h>
+#include <commons/log.h>
+
+
+
+t_log* logger_get(void) {
+    static t_log* l = NULL;
+    if (!l)
+        l = log_create("tests.log", "TESTS", false, LOG_LEVEL_INFO);
+    return l;
+}
+
+static int mm_test_write(memory_manager_t *mm, page_table_t *pt,
+                         uint32_t base, const void *data, size_t size)
+{
+    return mm_write_to_memory(mm, pt, "TEST_FILE", "TEST_TAG",
+                              base, data, size);
+}
+
+static int mm_test_read(memory_manager_t *mm, page_table_t *pt,
+                        uint32_t base, size_t size, void *out)
+{
+    return mm_read_from_memory(mm, pt, "TEST_FILE", "TEST_TAG",
+                               base, size, out);
+}
+
 
 context(memory_manager_tests) {
     describe("Crear administrador de memoria") {
@@ -97,14 +122,14 @@ context(memory_manager_tests) {
         it("debería retornar error al intentar escribir en una tabla de páginas inexistente") {
             char data[100] = "prueba";
 
-            int result = mm_write_to_memory(mm, NULL, 0, data, sizeof(data));
+            int result = mm_test_write(mm, NULL, 0, data, sizeof(data));
 
             should_int(result) be equal to(-1);
         } end
         it("debería retornar error al intentar escribir datos nulos") {
             page_table_t *pt = mm_create_page_table(mm, "file1", "tag1");
 
-            int result = mm_write_to_memory(mm, pt, 0, NULL, 100);
+            int result = mm_test_write(mm, pt, 0, NULL, 100);
 
             should_int(result) be equal to(-1);
         } end
@@ -112,7 +137,7 @@ context(memory_manager_tests) {
             page_table_t *pt = mm_create_page_table(mm, "file1", "tag1");
             char data[100] = "prueba";
 
-            int result = mm_write_to_memory(mm, pt, 0, data, 0);
+            int result = mm_test_write(mm, pt, 0, data, 0);
 
             should_int(result) be equal to(-1);
         } end
@@ -120,7 +145,7 @@ context(memory_manager_tests) {
             page_table_t *pt = mm_create_page_table(mm, "file1", "tag1");
             char data[100] = "prueba";
 
-            int result = mm_write_to_memory(mm, pt, 4096 * pt->page_count, data, sizeof(data));
+            int result = mm_test_write(mm, pt, 4096 * pt->page_count, data, sizeof(data));
 
             should_int(result) be equal to(-1);
         } end
@@ -132,7 +157,7 @@ context(memory_manager_tests) {
                 pt_map(pt, i, i);
             }
 
-            int result = mm_write_to_memory(mm, pt, 0, data, strlen(data));
+            int result = mm_test_write(mm, pt, 0, data, strlen(data));
 
             should_int(result) be equal to(0);
             should_bool(pt->entries[0].dirty) be equal to(true);
@@ -154,7 +179,7 @@ context(memory_manager_tests) {
             for (size_t i = 0; i < 1; i++) {
                 pt_map(pt, i, i);
             }
-            mm_write_to_memory(mm, pt, 0, data, strlen(data));
+            mm_test_write(mm, pt, 0, data, strlen(data));
         } end
 
         after {
@@ -162,14 +187,14 @@ context(memory_manager_tests) {
         } end
 
         it("debería retornar error al intentar leer de una tabla de páginas inexistente") {
-            int result = mm_read_from_memory(mm, NULL, 0, sizeof(buffer), buffer);
+            int result = mm_test_read(mm, NULL, 0, sizeof(buffer), buffer);
 
             should_int(result) be equal to(-1);
         } end
         it("debería retornar error al intentar leer en un buffer nulo") {
             page_table_t *pt = mm_create_page_table(mm, "file1", "tag1");
 
-            int result = mm_read_from_memory(mm, pt, 0, 100, NULL);
+            int result = mm_test_read(mm, pt, 0, 100, NULL);
 
             should_int(result) be equal to(-1);
         } end
@@ -177,7 +202,7 @@ context(memory_manager_tests) {
             page_table_t *pt = mm_create_page_table(mm, "file1", "tag1");
             char buffer[100];
 
-            int result = mm_read_from_memory(mm, pt, 0, 0, buffer);
+            int result = mm_test_read(mm, pt, 0, 0, buffer);
 
             should_int(result) be equal to(-1);
         } end
@@ -185,7 +210,7 @@ context(memory_manager_tests) {
             page_table_t *pt = mm_create_page_table(mm, "file1", "tag1");
             char buffer[100];
 
-            int result = mm_read_from_memory(mm, pt, 4096 * pt->page_count, sizeof(buffer), buffer);
+            int result = mm_test_read(mm, pt, 4096 * pt->page_count, sizeof(buffer), buffer);
 
             should_int(result) be equal to(-1);
         } end
@@ -196,8 +221,8 @@ context(memory_manager_tests) {
             for (size_t i = 0; i < 1; i++) {
                 pt_map(pt, i, i);
             }
-            mm_write_to_memory(mm, pt, 0, data, strlen(data));
-            mm_read_from_memory(mm, pt, 0, sizeof(buffer), buffer);
+            mm_test_write(mm, pt, 0, data, strlen(data));
+            mm_test_read(mm, pt, 0, sizeof(buffer), buffer);
             should_string(buffer) be equal to(data);
         } end
     } end
@@ -213,7 +238,7 @@ context(memory_manager_tests) {
             for (size_t i = 0; i < 1; i++) {
                 pt_map(pt, i, i);
             }
-            mm_write_to_memory(mm, pt, 0, data, strlen(data));
+            mm_test_write(mm, pt, 0, data, strlen(data));
         } end
 
         after {
@@ -235,4 +260,79 @@ context(memory_manager_tests) {
             should_bool(dirty_pages[0].dirty) be equal to(true);
         } end
     } end
-}
+    describe("Algoritmo de reemplazo LRU") {
+        memory_manager_t *mm = NULL;
+
+        before {
+            mm = mm_create(4096 * 4, 1024, LRU, 0);
+            for (int i = 0; i < 4; i++) {
+                char file[16], tag[16];
+                sprintf(file, "file_%d", i);
+                sprintf(tag, "tag_%d", i);
+
+                page_table_t *pt = mm_create_page_table(mm, file, tag);
+                pt_map(pt, 0, i);
+
+                mm->frame_table.frames[i].used = true;
+                pt->entries[0].present = true;
+                pt->entries[0].frame = i;
+                pt->entries[0].last_access_time = i + 1;
+            }
+        } end
+
+        after {
+            mm_destroy(mm);
+        } end
+
+        it("debería seleccionar la página con menor last_access_time como víctima") {
+            int victim_frame = mm_find_lru_victim(mm);
+            should_int(victim_frame) be equal to(0);
+        } end
+
+        it("debería marcar el marco de la víctima como libre") {
+            int victim_frame = mm_find_lru_victim(mm);
+            should_bool(mm->frame_table.frames[victim_frame].used) be equal to(false);
+        } end
+
+    } end
+
+    describe("Algoritmo de reemplazo CLOCK-M") {
+
+        memory_manager_t *mm = NULL;
+
+        before {
+            mm = mm_create(4096 * 4, 4096, CLOCK_M, 0);
+
+            for (int i = 0; i < 4; i++) {
+                char file[16], tag[16];
+                sprintf(file, "f%d", i);
+                sprintf(tag, "t%d", i);
+
+                page_table_t *pt = mm_create_page_table(mm, file, tag);
+                pt_map(pt, 0, i);
+
+                pt->entries[0].present = true;
+                pt->entries[0].frame   = i;
+                pt->entries[0].dirty   = false;
+                // solo el 2 tiene U=0, el resto U=1
+                pt->entries[0].use_bit = (i != 2);
+
+                mm->frame_table.frames[i].used = true;
+            }
+
+            mm->frame_table.clock_pointer = 0;
+        } end
+
+        after {
+            mm_destroy(mm);
+        } end
+
+        it("elige el primer frame con U=0 y M=0") {
+            int victim = mm_find_clockm_victim(mm);
+            should_int(victim) be equal to(2);
+        } end
+
+    } end
+}   // cierra context(memory_manager_tests)
+
+

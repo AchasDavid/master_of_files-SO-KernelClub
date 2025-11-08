@@ -5,7 +5,7 @@
 static uint64_t global_timestamp = 0;
 
 //--Helper--
-static bool mm_find_page_for_frame(
+bool mm_find_page_for_frame(
     memory_manager_t *mm,
     uint32_t frame_idx,
     file_tag_entry_t **out_entry,
@@ -480,8 +480,6 @@ int mm_find_lru_victim(memory_manager_t *mm)
     char *victim_tag = NULL;
     uint32_t victim_page = (uint32_t)-1;
     page_table_t *victim_pt = NULL;
-    //Solo info adicional para loguear
-    bool was_dirty = false;
 
     
     for (uint32_t i = 0; i < mm->count; i++)
@@ -515,7 +513,6 @@ int mm_find_lru_victim(memory_manager_t *mm)
         if (victim_pt && victim_pt->entries[victim_page].dirty)
         {
             
-            was_dirty = true;
             log_info(logger_get(),
                     "## Query %d: Página sucia siendo reemplazada - File: %s - Tag: %s - Pagina: %d",
                     mm->query_id, victim_file, victim_tag, victim_page);

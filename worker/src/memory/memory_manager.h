@@ -77,4 +77,8 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
 int mm_find_lru_victim(memory_manager_t *mm);
 void mm_update_page_access(memory_manager_t *mm, page_table_t *pt, uint32_t page_number);
 
+int mm_find_lru_victim(memory_manager_t *mm);
+int mm_find_clockm_victim(memory_manager_t *mm);   
+bool mm_find_page_for_frame(memory_manager_t *mm, uint32_t frame_idx, file_tag_entry_t **out_entry, page_table_t **out_pt, uint32_t *out_page_idx );
+
 #endif
