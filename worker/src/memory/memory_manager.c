@@ -4,6 +4,32 @@
 
 static uint64_t global_timestamp = 0;
 
+//--Helper--
+static bool mm_find_page_for_frame(
+    memory_manager_t *mm,
+    uint32_t frame_idx,
+    file_tag_entry_t **out_entry,
+    page_table_t **out_pt,
+    uint32_t *out_page_idx
+)
+{
+    for (uint32_t i = 0; i < mm->count; i++) {
+        file_tag_entry_t *entry = &mm->entries[i];
+        page_table_t *pt = entry->page_table;
+
+        for (uint32_t j = 0; j < pt->page_count; j++) {
+            pt_entry_t *page = &pt->entries[j];
+            if (page->present && page->frame == frame_idx) {
+                if (out_entry)    *out_entry    = entry;
+                if (out_pt)       *out_pt       = pt;
+                if (out_page_idx) *out_page_idx = j;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 static void mm_resize_entries(memory_manager_t *mm)
 {
     if (mm->count < mm->capacity)
@@ -36,6 +62,11 @@ memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement
     mm->storage_socket = -1;
     mm->worker_id = -1;
     mm->query_id = -1;
+    mm->last_victim_file = NULL;
+    mm->last_victim_tag = NULL;
+    mm->last_victim_page = 0;
+    mm->last_victim_valid = false;
+
 
     mm->physical_memory = malloc(memory_size);
     if (!mm->physical_memory)
@@ -175,6 +206,8 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     if (frame == -1)
         return -1;
 
+    mm->frame_table.frames[frame].used = true;
+
     uint32_t block_number = page_number;
 
     void *data = NULL;
@@ -216,6 +249,19 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     log_info(logger_get(),
              "## Query %d: - Memoria Add - File: %s - Tag: %s - Pagina: %d - Marco: %d",
              mm->query_id, file, tag, page_number, frame);
+
+    if (mm->last_victim_valid) {
+        log_info(logger_get(),
+                 "## Query %d: Se reemplaza la página %s:%s/%d por la %s:%s/%d",
+                 mm->query_id,
+                 mm->last_victim_file,
+                 mm->last_victim_tag,
+                 mm->last_victim_page,
+                 file,
+                 tag,
+                 page_number);
+        mm->last_victim_valid = false;
+    }
 
     return 0;
 }
@@ -324,6 +370,18 @@ int mm_allocate_frame(memory_manager_t *mm)
             return victim_frame;
         }
     }
+    else if (mm->policy == CLOCK_M)
+    {
+        int victim_frame = mm_find_clockm_victim(mm);
+        if (victim_frame != -1)
+        {
+            log_info(logger_get(),
+                     "## Query %d: Frame %d liberado usando algoritmo CLOCK-M",
+                     mm->query_id,
+                     victim_frame);
+            return victim_frame;
+        }
+    }
     
     return -1;
 }
@@ -360,22 +418,37 @@ void mm_mark_all_clean(memory_manager_t *mm, char *file, char *tag)
 
 void mm_update_page_access(memory_manager_t *mm, page_table_t *pt, uint32_t page_number)
 {
-    if (!mm || !pt || mm->policy != LRU)
+    if (!mm || !pt)
+        return;
+
+    if (page_number >= pt->page_count)
         return;
     
-    pt_update_access_time(pt, page_number, ++global_timestamp);
+    if (mm->policy == LRU) {
+        pt_update_access_time(pt, page_number, ++global_timestamp);
+        return;
+    }
+
+    if (mm->policy == CLOCK_M) {
+        pt->entries[page_number].use_bit = true;
+        return;
+    }
 }
 
 int mm_find_lru_victim(memory_manager_t *mm)
 {
-    if (!mm || mm->policy != LRU)
+    if (!mm)
         return -1;
     
     uint64_t oldest_time = UINT64_MAX;
-    uint32_t victim_frame = -1;
+    uint32_t victim_frame = (uint32_t)-1;
     char *victim_file = NULL;
     char *victim_tag = NULL;
-    uint32_t victim_page = -1;
+    uint32_t victim_page = (uint32_t)-1;
+    page_table_t *victim_pt = NULL;
+    //Solo info adicional para loguear
+    bool was_dirty = false;
+
     
     for (uint32_t i = 0; i < mm->count; i++)
     {
@@ -395,22 +468,227 @@ int mm_find_lru_victim(memory_manager_t *mm)
             }
         }
     }
+
     
     if (victim_frame != (uint32_t)-1)
     {
+
+        victim_pt = mm_find_page_table(mm, victim_file, victim_tag);
+
+
         log_info(logger_get(), 
-                "## Query %d: - Memoria Liberar - File: %s - Tag: %s - Pagina: %d - Marco: %d (LRU)",
-                mm->query_id, victim_file, victim_tag, victim_page, victim_frame);
+                "## Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
+                mm->query_id, victim_frame, victim_file, victim_tag);
         
-        page_table_t *victim_pt = mm_find_page_table(mm, victim_file, victim_tag);
+        victim_pt = mm_find_page_table(mm, victim_file, victim_tag);
+
         if (victim_pt && victim_pt->entries[victim_page].dirty)
         {
+            
+            was_dirty = true;
             log_info(logger_get(),
                     "## Query %d: Página sucia siendo reemplazada - File: %s - Tag: %s - Pagina: %d",
                     mm->query_id, victim_file, victim_tag, victim_page);
+
+        void *frame_addr = mm_get_frame_address(mm, victim_frame);
+
+        int write_result = write_block_to_storage(
+            mm->storage_socket,
+            victim_file,
+            victim_tag,
+            victim_page,           
+            frame_addr,
+            mm->page_size,
+            mm->worker_id
+        );
+
+         if (write_result != 0)
+        {
+            log_error(logger_get(),
+                      "## Query %d: Error al escribir página sucia en Storage - File: %s - Tag: %s - Pagina: %d",
+                      mm->query_id, victim_file, victim_tag, victim_page);
+
         }
-        pt_unmap(victim_pt, victim_page);
-    }
+         else
+        {
+            log_info(logger_get(),
+                     "## Query %d: Página sucia escrita en Storage - File: %s - Tag: %s - Pagina: %d",
+                     mm->query_id, victim_file, victim_tag, victim_page);
+        }
+
+        }
+
+        if(victim_pt){
+            pt_unmap(victim_pt, victim_page);
+        }
     
+
+        mm->frame_table.frames[victim_frame].used = false;
+
+        log_info(logger_get(),
+             "## Query %d: - Se libera el Marco: %d - File: %s - Tag: %s ",
+             mm->query_id,
+             victim_frame,
+             victim_file,
+             victim_tag
+             );
+
+        mm->last_victim_file  = victim_file;
+        mm->last_victim_tag   = victim_tag;
+        mm->last_victim_page  = victim_page;
+        mm->last_victim_valid = true;  
+    }          
+
     return victim_frame;
+}
+
+int mm_find_clockm_victim(memory_manager_t *mm)
+{
+    if (!mm || mm->policy != CLOCK_M)
+        return -1;
+
+    uint32_t frame_count = mm->frame_table.frame_count;
+    if (frame_count == 0)
+        return -1;
+
+    while (1) {
+
+        /* -------------- PASADA 1: buscar (U=0, M=0) -------------- */
+        for (uint32_t k = 0; k < frame_count; k++) {
+
+            uint32_t idx = mm->frame_table.clock_pointer;
+
+            // si el marco está libre, avanzar
+            if (!mm->frame_table.frames[idx].used) {
+                mm->frame_table.clock_pointer = (idx + 1) % frame_count;
+                continue;
+            }
+
+            file_tag_entry_t *entry = NULL;
+            page_table_t *pt = NULL;
+            uint32_t page_idx = 0;
+
+            bool found = mm_find_page_for_frame(mm, idx, &entry, &pt, &page_idx);
+            if (!found) {
+                mm->frame_table.clock_pointer = (idx + 1) % frame_count;
+                continue;
+            }
+
+            pt_entry_t *page = &pt->entries[page_idx];
+
+            // condición ideal de la 1ra pasada
+            if (page->use_bit == false && page->dirty == false) {
+
+                // desmapear y liberar marco
+                pt_unmap(pt, page_idx);
+                mm->frame_table.frames[idx].used = false;
+
+                log_info(logger_get(),
+                         "## Query %d: - Se libera el Marco: %d - File: %s - Tag: %s",
+                         mm->query_id, idx, entry->file, entry->tag);
+
+                mm->last_victim_file  = entry->file;
+                mm->last_victim_tag   = entry->tag;
+                mm->last_victim_page  = page_idx;
+                mm->last_victim_valid = true;         
+
+                mm->frame_table.clock_pointer = (idx + 1) % frame_count;
+                return (int)idx;
+            }
+
+            mm->frame_table.clock_pointer = (idx + 1) % frame_count;
+        }
+
+        /* -------------- PASADA 2: buscar (U=0, M=1) y limpiar U=1 -------------- */
+        int dirty_candidate_frame = -1;
+        file_tag_entry_t *dirty_entry = NULL;
+        page_table_t *dirty_pt = NULL;
+        uint32_t dirty_page_idx = 0;
+
+        for (uint32_t k = 0; k < frame_count; k++) {
+
+            uint32_t idx = mm->frame_table.clock_pointer;
+
+            if (!mm->frame_table.frames[idx].used) {
+                mm->frame_table.clock_pointer = (idx + 1) % frame_count;
+                continue;
+            }
+
+            file_tag_entry_t *entry = NULL;
+            page_table_t *pt = NULL;
+            uint32_t page_idx = 0;
+
+            bool found = mm_find_page_for_frame(mm, idx, &entry, &pt, &page_idx);
+            if (!found) {
+                mm->frame_table.clock_pointer = (idx + 1) % frame_count;
+                continue;
+            }
+
+            pt_entry_t *page = &pt->entries[page_idx];
+
+
+            // buscamos el primero con U=0 y M=1
+            if (page->use_bit == false && page->dirty == true && dirty_candidate_frame == -1) {
+                dirty_candidate_frame = idx;
+                dirty_entry = entry;
+                dirty_pt = pt;
+                dirty_page_idx = page_idx;
+            }
+
+               // en la segunda pasada, SI vemos U=1 lo limpiamos
+            if (page->use_bit == true) {
+                page->use_bit = false;
+            }
+
+            mm->frame_table.clock_pointer = (idx + 1) % frame_count;
+            
+        }
+
+        // si en la segunda pasada encontramos uno modificado con U=0, lo usamos
+        if (dirty_candidate_frame != -1) {
+
+            void *frame_addr = mm_get_frame_address(mm, dirty_candidate_frame);
+
+            int write_result = write_block_to_storage(
+                mm->storage_socket,
+                dirty_entry->file,
+                dirty_entry->tag,
+                dirty_page_idx,
+                frame_addr,
+                mm->page_size,
+                mm->worker_id
+            );
+
+            if (write_result != 0) {
+                log_error(logger_get(),
+                          "## Query %d: Error al escribir página sucia en Storage - File: %s - Tag: %s - Pagina: %d",
+                          mm->query_id, dirty_entry->file, dirty_entry->tag, dirty_page_idx);
+            } else {
+                log_info(logger_get(),
+                         "## Query %d: Página sucia escrita en Storage - File: %s - Tag: %s - Pagina: %d",
+                         mm->query_id, dirty_entry->file, dirty_entry->tag, dirty_page_idx);
+            }
+
+            pt_unmap(dirty_pt, dirty_page_idx);
+            mm->frame_table.frames[dirty_candidate_frame].used = false;
+
+            log_info(logger_get(),
+                     "## Query %d: - Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
+                     mm->query_id,
+                     dirty_candidate_frame,
+                     dirty_entry->file,
+                     dirty_entry->tag
+                     );
+
+            mm->last_victim_file  = dirty_entry->file;
+            mm->last_victim_tag   = dirty_entry->tag;
+            mm->last_victim_page  = dirty_page_idx;
+            mm->last_victim_valid = true;
+
+            mm->frame_table.clock_pointer = (dirty_candidate_frame + 1) % frame_count;
+            return dirty_candidate_frame;
+        }
+    }
+
+    return -1;
 }

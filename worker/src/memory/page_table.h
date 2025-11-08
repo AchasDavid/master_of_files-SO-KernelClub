@@ -11,6 +11,7 @@ typedef struct {
     bool dirty;
     bool present;
     uint64_t last_access_time;
+    bool use_bit;
 } pt_entry_t;
 
 typedef struct {

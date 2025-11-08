@@ -10,7 +10,7 @@
 
 typedef enum
 {
-    CLOCK,
+    CLOCK_M,
     LRU
 } pt_replacement_t;
 
@@ -46,6 +46,11 @@ typedef struct
     int worker_id;
     int query_id;
     frame_table_t frame_table;
+    char *last_victim_file;
+    char *last_victim_tag;
+    uint32_t last_victim_page;
+    bool last_victim_valid;
+
 } memory_manager_t;
 
 memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement_t policy, int retardation_ms);
