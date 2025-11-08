@@ -335,8 +335,6 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
                  mm->query_id,
                  write ? "ESCRIBIR" : "LEER",
                  direccion_fisica,
-                 entry->frame,
-                 offset,
                  valor_ascii);
 
         ptr += bytes_to_copy;
@@ -550,14 +548,6 @@ int mm_find_lru_victim(memory_manager_t *mm)
     
 
         mm->frame_table.frames[victim_frame].used = false;
-
-        log_info(logger_get(),
-             "## Query %d: - Se libera el Marco: %d - File: %s - Tag: %s ",
-             mm->query_id,
-             victim_frame,
-             victim_file,
-             victim_tag
-             );
 
         mm->last_victim_file  = victim_file;
         mm->last_victim_tag   = victim_tag;
