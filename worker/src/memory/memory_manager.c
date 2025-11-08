@@ -309,6 +309,36 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
         if (write)
             pt_set_dirty(pt, current_page, true);
 
+
+        //  -- Armado de valor para log obligatorio --
+        char valor_ascii[65];                     
+        size_t log_len = (bytes_to_copy < 64) ? bytes_to_copy : 64;
+
+        if (write)
+            memcpy(valor_ascii, ptr, log_len);   
+        else
+            memcpy(valor_ascii, frame_addr + offset, log_len);  
+
+        valor_ascii[log_len] = '\0';
+
+        for (size_t k = 0; k < log_len; k++) {
+            if (valor_ascii[k] < 32 || valor_ascii[k] > 126)
+                valor_ascii[k] = '.';
+        }    
+
+        //  -- --
+
+        uint32_t direccion_fisica = entry->frame * page_size + offset;
+
+        log_info(logger_get(),
+                 "Query %d: Acción: %s - Dirección Física: %u - Valor: \"%s\"",
+                 mm->query_id,
+                 write ? "ESCRIBIR" : "LEER",
+                 direccion_fisica,
+                 entry->frame,
+                 offset,
+                 valor_ascii);
+
         ptr += bytes_to_copy;
         remaining -= bytes_to_copy;
         current_page++;
@@ -472,10 +502,6 @@ int mm_find_lru_victim(memory_manager_t *mm)
     
     if (victim_frame != (uint32_t)-1)
     {
-
-        victim_pt = mm_find_page_table(mm, victim_file, victim_tag);
-
-
         log_info(logger_get(), 
                 "## Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
                 mm->query_id, victim_frame, victim_file, victim_tag);
