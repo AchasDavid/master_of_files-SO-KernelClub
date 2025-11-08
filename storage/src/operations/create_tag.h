@@ -7,6 +7,7 @@
 #include "server/server.h"
 #include "utils/filesystem_utils.h"
 #include "errors.h"
+#include <inttypes.h>
 #include <stdint.h>
 
 /**

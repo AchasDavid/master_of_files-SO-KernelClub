@@ -60,6 +60,8 @@ int create_tag(uint32_t query_id, const char *name, const char *src_tag,
     retval = -4;
   }
 
+  log_info(g_storage_logger, "## %" PRIu32 " - Tag creado %s:%s", query_id, name, dst_tag);
+
 end:
   unlock_file(name, dst_tag);
   if (metadata) {
