@@ -12,7 +12,7 @@
 #include <utils/logger.h>
 #include <utils/utils.h>
 
-filesystemint create_dir_recursive(const char *path) {
+int create_dir_recursive(const char *path) {
   char command[PATH_MAX + 20];
   snprintf(command, sizeof(command), "mkdir -p \"%s\"", path);
 

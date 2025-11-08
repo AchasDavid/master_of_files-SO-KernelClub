@@ -6,28 +6,28 @@ int create_tag(uint32_t query_id, const char *name, const char *src_tag,
                const char *dst_tag) {
   int retval = 0;
 
+  char dst_path[PATH_MAX];
+  snprintf(dst_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point, name, dst_tag);
+  lock_file(name, dst_tag);
+
   t_file_metadata *metadata =
       read_file_metadata(g_storage_config->mount_point, name, dst_tag);
   if (metadata) {
     log_error(g_storage_logger,
               "## %u - No se puede crear el tag %s:%s porque ya existe",
               query_id, name, dst_tag);
-    destroy_file_metadata(metadata);
-    return -1;
+    retval = FILE_TAG_ALREADY_EXISTS;
+    goto end;
   }
 
   char src_path[PATH_MAX];
-  char dst_path[PATH_MAX];
   snprintf(src_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point,
            name, src_tag);
-  snprintf(dst_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point,
-           name, dst_tag);
 
   lock_file(name, src_tag);
-  lock_file(name, dst_tag);
 
   char command[PATH_MAX * 2 + 32];
-  snprintf(command, sizeof(command), "cp -r \"%s\" \"%s\"", src_path, dst_path);
+  snprintf(command, sizeof(command), "cp -rl \"%s\" \"%s\"", src_path, dst_path);
   int cmd_status_code = system(command);
 
   unlock_file(name, src_tag);
@@ -111,6 +111,8 @@ t_package *handle_create_tag_op_package(t_package *package) {
     package_destroy(response);
     return NULL;
   }
+
+  package_reset_read_offset(response);
 
   return response;
 }

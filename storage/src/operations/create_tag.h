@@ -6,6 +6,7 @@
 #include "globals/globals.h"
 #include "server/server.h"
 #include "utils/filesystem_utils.h"
+#include "errors.h"
 #include <stdint.h>
 
 /**

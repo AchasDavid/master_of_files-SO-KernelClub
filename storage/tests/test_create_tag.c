@@ -15,12 +15,10 @@
 
 context(test_create_tag) {
   describe("create_tag") {
-    t_log *test_logger;
 
     before {
       create_test_directory();
-      test_logger = create_test_logger();
-      g_storage_logger = test_logger;
+      g_storage_logger = create_test_logger();
 
       g_storage_config = malloc(sizeof(t_storage_config));
       g_storage_config->mount_point = strdup(TEST_MOUNT_POINT);
@@ -45,7 +43,7 @@ context(test_create_tag) {
       free(g_storage_config->mount_point);
       free(g_storage_config);
       g_storage_config = NULL;
-      destroy_test_logger(test_logger);
+      destroy_test_logger(g_storage_logger);
       cleanup_test_directory();
     }
     end
@@ -97,7 +95,7 @@ context(test_create_tag) {
       _create_file(2, "test_file", "v2", TEST_MOUNT_POINT);
 
       int result = create_tag(3, "test_file", "v1", "v2");
-      should_int(result) be equal to(-1);
+      should_int(result) be equal to(FILE_TAG_ALREADY_EXISTS);
     }
     end
 
