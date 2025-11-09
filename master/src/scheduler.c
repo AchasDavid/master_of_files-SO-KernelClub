@@ -110,6 +110,11 @@ unlock_and_exit:
 }
 
 int send_query_to_worker(t_master *master, t_worker_control_block *worker, t_query_control_block *query) {
+    #ifdef TEST_ENVIRONMENT
+    log_info(master->logger, "[send_query_to_worker] (TEST) Simulación de envío de Query ID=%d al Worker ID=%d", query->query_id, worker->worker_id);
+    return 0;
+    #endif
+    
     // Validaciones básicas
     if (master == NULL || worker == NULL || query == NULL) {
         fprintf(stderr, "[send_query_to_worker] Parámetros inválidos (master, worker o query NULL).\n");

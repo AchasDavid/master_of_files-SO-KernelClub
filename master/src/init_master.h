@@ -39,6 +39,8 @@ typedef struct master {
     pthread_t aging_thread; // Hilo de envejecimiento
     pthread_t scheduling_thread; // Hilo de planificación
 
+    bool running; // para safe shutdown
+
     // Logger
     t_log *logger;
 } t_master;

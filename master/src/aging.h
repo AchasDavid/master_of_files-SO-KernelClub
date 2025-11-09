@@ -1,6 +1,8 @@
 #ifndef AGING_H
 #define AGING_H
-
+#include "init_master.h"
+#include "worker_manager.h"
+#include "query_control_manager.h"
 
 bool _qcb_priority_compare(void *a, void *b);
 bool match_worker_by_id(void *elem);

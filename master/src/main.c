@@ -15,6 +15,7 @@
 #include <query_control_manager.h>
 #include <worker_manager.h>
 #include <config/master_config.h>
+#include <aging.h>
 #include <disconnection_handler.h>
 
 #define MODULO "MASTER"
@@ -77,6 +78,14 @@ int main(int argc, char* argv[]) {
     
     // Inicio el servidor
     int server_socket_fd = start_server(master->ip, master->port);
+
+    // Inicio hilo aging (si estoy en priotidad)
+    if(strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
+        pthread_create(&master->aging_thread, NULL, aging_thread_func, master);
+        log_info(master->logger, "Aging habilitado (scheduler PRIORITY)");
+    } else {
+        log_info(master->logger, "Aging deshabilitado (scheduler FIFO)");
+    }
 
     if (server_socket_fd < 0) 
     {
