@@ -21,3 +21,14 @@ obj/
 
 # Valgrind files
 vgcore.*
+
+# Binarios de test
+/tests/*/test_*
+
+# Archivos objeto
+*.o
+
+# Archivos temporales
+*.out
+*.tmp
+

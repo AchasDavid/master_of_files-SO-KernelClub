@@ -21,3 +21,23 @@ size_t strlcpy(char *dest, const char *source, size_t size) {
 
     return strlen(source);
 }
+
+char* get_stringified_array(char** array) {
+    char* resultado = string_new();
+    string_append(&resultado, "[");
+    
+    for(int i = 0; array[i] != NULL; i++) {
+        if(i > 0) {
+            string_append(&resultado, ",");
+        }
+        string_append(&resultado, array[i]);
+    }
+    
+    string_append(&resultado, "]");
+    return resultado;
+}
+
+bool regular_file_exists(char *file_path) {
+  struct stat info;
+  return (stat(file_path, &info) == 0 && S_ISREG(info.st_mode));
+}
