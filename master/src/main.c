@@ -16,6 +16,7 @@
 #include <worker_manager.h>
 #include <config/master_config.h>
 #include <aging.h>
+#include <disconnection_handler.h>
 
 #define MODULO "MASTER"
 #define LOG_LEVEL LOG_LEVEL_DEBUG //inicialmente DEBUG, luego se setea desde el config
