@@ -10,7 +10,7 @@
 
 typedef enum
 {
-    CLOCK,
+    CLOCK_M,
     LRU
 } pt_replacement_t;
 
@@ -45,13 +45,18 @@ typedef struct
     int storage_socket;
     int worker_id;
     int query_id;
-
     frame_table_t frame_table;
+    char *last_victim_file;
+    char *last_victim_tag;
+    uint32_t last_victim_page;
+    bool last_victim_valid;
+
 } memory_manager_t;
 
 memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement_t policy, int retardation_ms);
 void mm_destroy(memory_manager_t *mm);
 void mm_set_storage_connection(memory_manager_t *mm, int storage_socket, int worker_id);
+void mm_set_query_id(memory_manager_t *mm, int query_id);
 
 page_table_t *mm_find_page_table(memory_manager_t *mm, char *file, char *tag);
 page_table_t *mm_create_page_table(memory_manager_t *mm, char *file, char *tag);
@@ -68,5 +73,12 @@ pt_entry_t *mm_get_dirty_pages(memory_manager_t *mm, char *file, char *tag, size
 bool mm_has_page_table(memory_manager_t *mm, char *file, char *tag);
 void mm_mark_all_clean(memory_manager_t *mm, char *file, char *tag);
 int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, char *tag, uint32_t page_number);
+
+int mm_find_lru_victim(memory_manager_t *mm);
+void mm_update_page_access(memory_manager_t *mm, page_table_t *pt, uint32_t page_number);
+
+int mm_find_lru_victim(memory_manager_t *mm);
+int mm_find_clockm_victim(memory_manager_t *mm);   
+bool mm_find_page_for_frame(memory_manager_t *mm, uint32_t frame_idx, file_tag_entry_t **out_entry, page_table_t **out_pt, uint32_t *out_page_idx );
 
 #endif

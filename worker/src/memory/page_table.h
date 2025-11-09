@@ -10,6 +10,8 @@ typedef struct {
     uint32_t frame;
     bool dirty;
     bool present;
+    uint64_t last_access_time;
+    bool use_bit;
 } pt_entry_t;
 
 typedef struct {
@@ -27,6 +29,7 @@ int pt_unmap(page_table_t *page_table, uint32_t page_number);
 
 void pt_set_dirty(page_table_t *page_table, uint32_t page_number, bool dirty);
 void pt_set_present(page_table_t *page_table, uint32_t page_number, bool present);
+void pt_update_access_time(page_table_t *page_table, uint32_t page_number, uint64_t timestamp);
 
 pt_entry_t *pt_get_dirty_entries(page_table_t *page_table, size_t *count);
 

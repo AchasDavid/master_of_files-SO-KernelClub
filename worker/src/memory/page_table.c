@@ -27,7 +27,10 @@ page_table_t *pt_create(uint32_t page_count, size_t page_size)
     pt->page_size = page_size;
 
     for (uint32_t i = 0; i < page_count; i++)
+    {
         pt->entries[i].page_number = i;
+        pt->entries[i].last_access_time = 0;
+    }
 
     return pt;
 }
@@ -76,6 +79,13 @@ void pt_set_present(page_table_t *pt, uint32_t page_number, bool present)
     pt_entry_t *entry = pt_get_entry(pt, page_number);
     if (entry)
         entry->present = present;
+}
+
+void pt_update_access_time(page_table_t *pt, uint32_t page_number, uint64_t timestamp)
+{
+    pt_entry_t *entry = pt_get_entry(pt, page_number);
+    if (entry)
+        entry->last_access_time = timestamp;
 }
 
 pt_entry_t *pt_get_dirty_entries(page_table_t *pt, size_t *count)
