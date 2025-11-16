@@ -54,7 +54,7 @@ void *handle_client(void *arg) {
       response = handle_write_block_request(request);
       break;
     case STORAGE_OP_BLOCK_READ_REQ:
-      response = read_block(request);
+      response = handle_read_block_request(request);
       break;
     case STORAGE_OP_TAG_DELETE_REQ:
       response = handle_delete_tag_op_package(request);
