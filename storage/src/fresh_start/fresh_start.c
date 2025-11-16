@@ -152,7 +152,7 @@ int init_physical_blocks(const char *mount_point, int fs_size, int block_size) {
 // Desactiva el warning de GCC sobre truncamiento de snprintf
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-    snprintf(new_block_path, sizeof(new_block_path), "%s/%04d.dat",
+    snprintf(new_block_path, sizeof(new_block_path), "%s/block%04d.dat",
              physical_blocks_dir_path, i);
 #pragma GCC diagnostic pop
 
