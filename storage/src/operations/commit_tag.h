@@ -5,6 +5,7 @@
 #include "connection/protocol.h"
 #include "globals/globals.h"
 #include "server/server.h"
+#include "utils/filesystem_utils.h"
 
 /**
  * Maneja la solicitud de COMMIT_TAG de un cliente.
