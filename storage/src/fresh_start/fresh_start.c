@@ -193,7 +193,7 @@ int init_files(const char *mount_point) {
     return -1;
   }
 
-  snprintf(source_path, PATH_MAX, "%s/physical_blocks/0000.dat", mount_point);
+  snprintf(source_path, PATH_MAX, "%s/physical_blocks/block0000.dat", mount_point);
   snprintf(target_path, PATH_MAX,
            "%s/files/initial_file/BASE/logical_blocks/0000.dat", mount_point);
   if (link(source_path, target_path) != 0) {
@@ -220,10 +220,9 @@ int init_files(const char *mount_point) {
  * función se rompió
  */
 int init_storage(const char *mount_point) {
-  int fs_size, block_size;
+  int fs_size = g_storage_config->fs_size;
+  int block_size = g_storage_config->block_size;
 
-  if (read_superblock(mount_point, &fs_size, &block_size) != 0)
-    return -1;
   if (wipe_storage_content(mount_point) != 0)
     return -2;
   if (init_bitmap(mount_point, fs_size, block_size) != 0)
