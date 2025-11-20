@@ -28,6 +28,7 @@ t_package *handle_read_block_request(t_package *package) {
     log_error(g_storage_logger,
               "## Query ID: %" PRIu32 " - Fallo al crear paquete de respuesta.",
               query_id);
+    free(read_buffer);
     return NULL;
   }
 
