@@ -103,10 +103,14 @@ t_query_control_block *create_query(t_master *master, int query_id, char *query_
     list_add(master->queries_table->query_list, qcb);
 
     if (strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
-        if(insert_query_by_priority(master->queries_table->ready_queue, qcb) != 0)
+        if(insert_query_by_priority(master->queries_table->ready_queue, qcb) != 0){
             log_error(master->logger, "Error al intentar insertar query (query ID: %d) en Ready Queue.", query_id);
+       
+        }
+        log_debug(master->logger, "Query id %d agregada a la Ready QUEUE (PRIORITY)", qcb->query_id);
     } else {
         list_add(master->queries_table->ready_queue, qcb);
+        log_debug(master->logger, "Query id %d agregada a la Ready QUEUE (FIFO)", qcb->query_id);
     }
 
     master->queries_table->total_queries++;
@@ -131,7 +135,6 @@ int insert_query_by_priority(t_list *ready_queue, t_query_control_block *new_qcb
             return 0; // Éxito
         }
     }
-
     // Si recorro la lista completa y todas las queries tienen mayor prioridad
     list_add(ready_queue, new_qcb);
     return 0; // Éxito

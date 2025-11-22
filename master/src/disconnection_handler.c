@@ -380,16 +380,6 @@ void cleanup_query_resources(t_query_control_block *qcb, t_master *master) {
             log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de running_list", qcb->query_id);
         }
     }
-    if (master->queries_table && master->queries_table->completed_list) {
-        if (list_remove_element(master->queries_table->completed_list, qcb)) {
-            log_debug(master->logger, "[cleanup_query_resources] Query ID=%d removida de completed_list", qcb->query_id);
-        }
-    }
-    if (master->queries_table && master->queries_table->canceled_list) {
-        if (!list_find(master->queries_table->canceled_list, (void*) qcb)) {
-            list_add(master->queries_table->canceled_list, qcb);
-        }
-    }
 
     // Liberar campos dinámicos
     if (qcb->query_file_path) {
@@ -416,22 +406,11 @@ void cleanup_worker_resources(t_worker_control_block *wcb, t_master *master) {
     if (master->workers_table && master->workers_table->busy_list) {
         list_remove_element(master->workers_table->busy_list, wcb);
     }
-    if (master->workers_table && master->workers_table->disconnected_list) {
-        if (!list_find(master->workers_table->disconnected_list, (void*) wcb)) {
-            list_add(master->workers_table->disconnected_list, wcb);
-        }
-    }
 
     // Reset fields
     wcb->current_query_id = -1;
     wcb->socket_fd = -1;
     wcb->state = WORKER_STATE_DISCONNECTED;
-
-    // Liberar memoria de strings si existen
-    if (wcb->ip_address) {
-        free(wcb->ip_address);
-        wcb->ip_address = NULL;
-    }
 }
 
 /**

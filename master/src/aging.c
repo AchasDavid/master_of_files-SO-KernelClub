@@ -2,6 +2,7 @@
 #include "worker_manager.h"
 #include "init_master.h"
 #include "aging.h"
+#include "disconnection_handler.h"
 #include <unistd.h>
 
 static int search_worker_id = -1;
@@ -9,7 +10,7 @@ static int search_worker_id = -1;
 void *aging_thread_func(void *arg) {
     t_master *master = (t_master*) arg;
 
-    while (master->running) {
+    while (1) {
         // Definir cada cuanto se hace la verificación, un tiempo fijo (100ms, 250ms)
         // o una fracción del aging interval (10 veces cada intervalo)
         usleep(master->aging_interval * 100); // -> Por ahora, 10 verificaciones por intervalo
@@ -22,7 +23,7 @@ void *aging_thread_func(void *arg) {
         }
 
         // si ready queue está vacia, nada para hacer
-        if (list_is_empty(master->queries_table->ready_queue)) {
+        if (list_is_empty(master->queries_table->ready_queue)) {            
             pthread_mutex_unlock(&master->queries_table->query_table_mutex);
             continue;
         }
@@ -79,7 +80,7 @@ void *aging_thread_func(void *arg) {
             list_sort(master->queries_table->ready_queue, _qcb_priority_compare);
         }
 
-        pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+        //pthread_mutex_unlock(&master->queries_table->query_table_mutex);
 
         check_preemption(master);
     }
@@ -90,7 +91,7 @@ void *aging_thread_func(void *arg) {
 void check_preemption(t_master *master) {
 
     pthread_mutex_lock(&master->workers_table->worker_table_mutex);
-    pthread_mutex_lock(&master->queries_table->query_table_mutex);
+    //pthread_mutex_lock(&master->queries_table->query_table_mutex);
 
     // Nada para hacer si no hay running o no hay ready
     if(list_is_empty(master->workers_table->busy_list) ||
@@ -136,17 +137,13 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
     );
 
     if (!worker || worker->socket_fd <= 0) {
-        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-
         log_error(master->logger,
             "[preempt_query_in_exec] Worker inválido durante preemption. Finalizando Query ID=%d",
             qcb->query_id
         );
 
-        // Estas dos funciones están en la PR que maneja desconexiones
-        // Quedan comentadas hasta que se apruebe
-        // finalize_query_with_error(qcb, master, "Error en preemption");
-        // cleanup_query_resources(qcb, master);
+        finalize_query_with_error(qcb, master, "Error en preemption");
+        cleanup_query_resources(qcb, master);
         return -1;
     }
 
@@ -161,7 +158,6 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
         qcb->query_id, qcb->priority, worker->worker_id
     );
 
-    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
     return 0;
 }
 
