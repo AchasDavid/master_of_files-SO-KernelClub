@@ -2,6 +2,7 @@
 #define STORAGE_OPERATIONS_COMMIT_TAG_H_
 
 #include <commons/crypto.h>
+#include <dirent.h>
 #include "connection/serialization.h"
 #include "connection/protocol.h"
 #include "globals/globals.h"
