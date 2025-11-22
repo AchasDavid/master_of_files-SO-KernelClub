@@ -49,8 +49,8 @@ void unlock_file(const char *name, const char *tag) {
 
   assert(fm != NULL && "unlock_file() llamado sin lock_file() previo");
 
-  fm->ref_count--;
   pthread_rwlock_unlock(&fm->mutex);
+  fm->ref_count--;
 
   if (fm->ref_count == 0) {
     dictionary_remove(g_open_files_dict, key);
