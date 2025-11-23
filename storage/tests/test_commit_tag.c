@@ -23,6 +23,7 @@ void setup_filesystem_environment() {
     create_test_directory();
     create_test_superblock(TEST_MOUNT_POINT);
     create_test_blocks_hash_index(TEST_MOUNT_POINT);
+    init_bitmap(TEST_MOUNT_POINT, TEST_FS_SIZE, TEST_BLOCK_SIZE);
     create_test_storage_config("9090", "99", "false", TEST_MOUNT_POINT, 100, 10, "INFO"); 
 
     char config_path[PATH_MAX];
@@ -115,21 +116,21 @@ context(tests_commit_tag) {
             destroy_test_logger(g_storage_logger);
         } end
 
-        it ("Debe comitear exitosamente un archivo en estado WORK_IN_PROGRESS") {
+        it ("Debe comitear exitosamente un archivo en estado WORK_IN_PROGRESS y registrar bloques unicos") {
             char *name = "file1";
             char *tag = "tag1";
             char *content = "Este es un contenido unico para el commit.";
             
-            write_physical_block_content(1, content, strlen(content));
             init_logical_blocks(name, tag, 1, TEST_MOUNT_POINT);
-            link_logical_to_physical(name, tag, 0, 1);
-            create_test_metadata(name, tag, 1, "[0]", (char*)IN_PROGRESS, g_storage_config->mount_point);
+            write_physical_block_content(3, content, strlen(content));
+            link_logical_to_physical(name, tag, 0, 3);
+            create_test_metadata(name, tag, 1, "[3]", (char*)IN_PROGRESS, g_storage_config->mount_point);
 
             int result = execute_tag_commit(200, name, tag);
 
             should_int(result) be equal to (0);
             
-            // VERIFICACIÓN DE DEDUPLICACIÓN (registro de hash)
+            // verificación del registro de hash
             char hash_index_path[PATH_MAX];
             get_hash_index_config_path(hash_index_path);
             t_config *hash_config = config_create(hash_index_path);
@@ -141,14 +142,153 @@ context(tests_commit_tag) {
             char *hash = crypto_md5(read_buffer, g_storage_config->block_size);
             should_bool(config_has_property(hash_config, hash)) be truthy;
             
+            char *ph_block_name = config_get_string_value(hash_config, hash);
+            should_string(ph_block_name) be equal to ("block0003");
+            
+            t_file_metadata *metadata_after_commit = read_file_metadata(g_storage_config->mount_point, name, tag);
+            should_string(metadata_after_commit->state) be equal to ((char*)COMMITTED);
+            
             // Cleanup de verificación
             free(hash);
+            free(read_buffer);
             config_destroy(hash_config);
-            t_file_metadata *metadata_after_commit = read_file_metadata(g_storage_config->mount_point, name, tag);
             if (metadata_after_commit) destroy_file_metadata(metadata_after_commit);
             should_bool(correct_unlock(name, tag)) be truthy;
         } end
         
+        it ("Debe comitear exitosamente un archivo duplicado (liberando el bloque fisico anterior)") {
+            char *name = "file1";
+            char *tag1 = "tag1";
+            char *tag2 = "tag2";
+            char *content = "Contenido duplicado para commit final";
+
+            // --- PASO 1: Setup archivo base (Simular commit previo) ---
+            init_logical_blocks(name, tag1, 1, TEST_MOUNT_POINT);
+            write_physical_block_content(3, content, strlen(content));
+            link_logical_to_physical(name, tag1, 0, 3);
+            create_test_metadata(name, tag1, 1, "[3]", (char*)IN_PROGRESS, g_storage_config->mount_point);
+            define_bitmap_bit(3, true); // Simular que el bloque 3 ya está en uso
+
+            execute_tag_commit(200, name, tag1);
+
+            // --- PASO 2: Setup del archivo a commitear (file1:v2) ---
+            init_logical_blocks(name, tag2, 1, TEST_MOUNT_POINT);
+            write_physical_block_content(5, content, strlen(content));
+            link_logical_to_physical(name, tag2, 0, 5);
+            create_test_metadata(name, tag2, 1, "[5]", (char*)IN_PROGRESS, g_storage_config->mount_point);
+            define_bitmap_bit(5, true); // Simular que el bloque 5 ya está en uso
+
+            // Ejecución
+            int result = execute_tag_commit(201, name, tag2);
+
+            should_int(result) be equal to (0);
+                        
+            // verificación del registro de hash
+            char hash_index_path[PATH_MAX];
+            get_hash_index_config_path(hash_index_path);
+            t_config *hash_config = config_create(hash_index_path);
+
+            char *read_buffer = (char *)malloc(g_storage_config->block_size);
+            memset(read_buffer, 0, g_storage_config->block_size);
+            memcpy(read_buffer, content, strlen(content));
+
+            char *hash = crypto_md5(read_buffer, g_storage_config->block_size);
+            should_bool(config_has_property(hash_config, hash)) be truthy;
+            
+            char *ph_block_name = config_get_string_value(hash_config, hash);
+            should_string(ph_block_name) be equal to ("block0003");            
+
+            should_int(config_keys_amount(hash_config)) be equal to (1); // Solo un bloque físico debe estar registrado
+            
+            t_file_metadata *metadata_after_commit = read_file_metadata(g_storage_config->mount_point, name, tag2);
+            should_string(metadata_after_commit->state) be equal to ((char*)COMMITTED);
+            should_int(metadata_after_commit->blocks[0]) be equal to (3);
+
+            t_bitarray *bitmap = NULL;
+            char *bitmap_buffer = NULL;
+            bitmap_load(&bitmap, &bitmap_buffer);
+            should_bool(bitarray_test_bit(bitmap, 3)) be equal to (true); // block0003 debe estar en uso
+            should_bool(bitarray_test_bit(bitmap, 5)) be equal to (false); // block0005 debe estar libre
+            bitmap_close(bitmap, bitmap_buffer);
+            
+            // Cleanup de verificación
+            free(hash);
+            free(read_buffer);
+            config_destroy(hash_config);
+            if (metadata_after_commit) destroy_file_metadata(metadata_after_commit);
+            should_bool(correct_unlock(name, tag1)) be truthy;
+            should_bool(correct_unlock(name, tag2)) be truthy;
+        } end
+
+        it ("Debe comitear exitosamente un archivo con bloques duplicados (liberando los bloques fisicos anteriores)") {
+            char *name = "file1";
+            char *tag1 = "tag1";
+            char *tag2 = "tag2";
+            char *content = "Contenido duplicado para commit final";
+
+            // --- PASO 1: Setup archivo base (Simular commit previo) ---
+            init_logical_blocks(name, tag1, 1, TEST_MOUNT_POINT);
+            write_physical_block_content(3, content, strlen(content));
+            link_logical_to_physical(name, tag1, 0, 3);
+            create_test_metadata(name, tag1, 1, "[3]", (char*)IN_PROGRESS, g_storage_config->mount_point);
+            define_bitmap_bit(3, true); // Simular que el bloque 3 ya está en uso
+
+            execute_tag_commit(200, name, tag1);
+
+            // --- PASO 2: Setup del archivo a commitear (file1:v2) ---
+            init_logical_blocks(name, tag2, 2, TEST_MOUNT_POINT);
+            write_physical_block_content(5, content, strlen(content));
+            write_physical_block_content(7, content, strlen(content));
+            link_logical_to_physical(name, tag2, 0, 5);
+            link_logical_to_physical(name, tag2, 1, 7);
+            create_test_metadata(name, tag2, 2, "[5, 7]", (char*)IN_PROGRESS, g_storage_config->mount_point);
+            define_bitmap_bit(5, true); // Simular que el bloque 5 ya está en uso
+            define_bitmap_bit(7, true); // Simular que el bloque 5 ya está en uso
+
+            // Ejecución
+            int result = execute_tag_commit(201, name, tag2);
+
+            should_int(result) be equal to (0);
+                        
+            // verificación del registro de hash
+            char hash_index_path[PATH_MAX];
+            get_hash_index_config_path(hash_index_path);
+            t_config *hash_config = config_create(hash_index_path);
+
+            char *read_buffer = (char *)malloc(g_storage_config->block_size);
+            memset(read_buffer, 0, g_storage_config->block_size);
+            memcpy(read_buffer, content, strlen(content));
+
+            char *hash = crypto_md5(read_buffer, g_storage_config->block_size);
+            should_bool(config_has_property(hash_config, hash)) be truthy;
+            
+            char *ph_block_name = config_get_string_value(hash_config, hash);
+            should_string(ph_block_name) be equal to ("block0003");            
+
+            should_int(config_keys_amount(hash_config)) be equal to (1); // Solo un bloque físico debe estar registrado
+            
+            t_file_metadata *metadata_after_commit = read_file_metadata(g_storage_config->mount_point, name, tag2);
+            should_string(metadata_after_commit->state) be equal to ((char*)COMMITTED);
+            should_int(metadata_after_commit->blocks[0]) be equal to (3);
+            should_int(metadata_after_commit->blocks[1]) be equal to (3);
+
+            t_bitarray *bitmap = NULL;
+            char *bitmap_buffer = NULL;
+            bitmap_load(&bitmap, &bitmap_buffer);
+            should_bool(bitarray_test_bit(bitmap, 3)) be equal to (true); // block0003 debe estar en uso
+            should_bool(bitarray_test_bit(bitmap, 5)) be equal to (false); // block0005 debe estar libre
+            should_bool(bitarray_test_bit(bitmap, 7)) be equal to (false); // block0007 debe estar libre
+            bitmap_close(bitmap, bitmap_buffer);
+            
+            // Cleanup de verificación
+            free(hash);
+            free(read_buffer);
+            config_destroy(hash_config);
+            if (metadata_after_commit) destroy_file_metadata(metadata_after_commit);
+            should_bool(correct_unlock(name, tag1)) be truthy;
+            should_bool(correct_unlock(name, tag2)) be truthy;
+        } end
+
         it ("Debe retornar SUCCESS si el archivo ya esta en estado COMMITTED (Idempotencia)") {
             char *name = "file1";
             char *tag = "tag1";

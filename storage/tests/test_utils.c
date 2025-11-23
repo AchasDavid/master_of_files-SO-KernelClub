@@ -259,10 +259,8 @@ void write_physical_block_content(int physical_id, const char *content, size_t c
         // Rellenar con ceros para alcanzar block_size para el hashing (asumiendo block_size=100)
         size_t block_size = g_storage_config->block_size;
         if (content_size < block_size) {
-            printf("hola4\n");
             char *zeros = calloc(1, block_size - content_size);
             fwrite(zeros, 1, block_size - content_size, f);
-            printf("hola5\n");
             free(zeros);
         }
         fclose(f);
@@ -291,5 +289,30 @@ void link_logical_to_physical(const char *name, const char *tag, int logical_id,
 char* get_hash_index_config_path(char *buffer) {
     snprintf(buffer, PATH_MAX, "%s/blocks_hash_index.config", TEST_MOUNT_POINT);
     return buffer;
+}
+
+void bitmap_close(t_bitarray *bitmap, char *buffer) {
+    if (bitmap) {
+        bitarray_destroy(bitmap);
+    }
+    if (buffer) {
+        free(buffer);
+    }
+    
+    pthread_mutex_unlock(&g_storage_bitmap_mutex);
+}
+
+void define_bitmap_bit(off_t bit_index, bool value) {
+    t_bitarray *bitmap = NULL;
+    char *bitmap_buffer = NULL;
+    bitmap_load(&bitmap, &bitmap_buffer);
+
+    if (value) {
+        bitarray_set_bit(bitmap, bit_index);
+    } else {
+        bitarray_clean_bit(bitmap, bit_index);
+    }
+
+    bitmap_persist(bitmap, bitmap_buffer);
 }
 
