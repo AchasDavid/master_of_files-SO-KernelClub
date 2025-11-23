@@ -62,7 +62,7 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
     char target_path[PATH_MAX];
     char physical_block_zero_path[PATH_MAX];
     snprintf(physical_block_zero_path, sizeof(physical_block_zero_path),
-             "%s/physical_blocks/0000.dat", mount_point);
+             "%s/physical_blocks/block0000.dat", mount_point);
 
     for (int i = old_block_count; i < new_block_count; i++) {
       snprintf(target_path, sizeof(target_path),
