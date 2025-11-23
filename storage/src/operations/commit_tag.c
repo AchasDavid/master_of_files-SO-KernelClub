@@ -115,7 +115,13 @@ int execute_tag_commit(uint32_t query_id, const char *name, const char *tag) {
     goto cleanup_metadata;
   }
 
-  deduplicate_blocks(query_id, name, tag, metadata);
+  if (deduplicate_blocks(query_id, name, tag, metadata) < 0) {
+    log_error(g_storage_logger,
+              "Query ID: %" PRIu32 " - Error en la deduplicación de bloques.",
+              query_id);
+    retval = -1;
+    goto cleanup_metadata;
+  }
 
   free(metadata->state);
   metadata->state = strdup(COMMITTED);
@@ -124,7 +130,7 @@ int execute_tag_commit(uint32_t query_id, const char *name, const char *tag) {
               "## Query ID: %" PRIu32
               " - Error de asignación de memoria al duplicar estado COMMITTED.",
               query_id);
-    retval = -1;
+    retval = -2;
     goto cleanup_metadata;
   }
 
@@ -134,7 +140,7 @@ int execute_tag_commit(uint32_t query_id, const char *name, const char *tag) {
         "## Query ID: %" PRIu32
         " - No se pudo actualizar el estado de metadata de %s:%s a COMMITTED.",
         query_id, name, tag);
-    retval = -2;
+    retval = -3;
     goto cleanup_metadata;
   }
 
@@ -168,8 +174,8 @@ int deduplicate_blocks(uint32_t query_id, const char *name, const char *tag,
   pthread_mutex_lock(g_blocks_hash_index_mutex);
   char hash_index_config_path[PATH_MAX];
   snprintf(hash_index_config_path, sizeof(hash_index_config_path),
-           "%s/blocks_hash_index.config", storage_config->mount_point);
-  t_config *hash_index_config = config_load(hash_index_config);
+           "%s/blocks_hash_index.config", g_storage_config->mount_point);
+  t_config *hash_index_config = config_load(hash_index_config_path);
 
   if (hash_index_config == NULL) {
     log_error(g_storage_logger,
@@ -184,55 +190,62 @@ int deduplicate_blocks(uint32_t query_id, const char *name, const char *tag,
   for (int i = 0; i < metadata->block_count; i++) {
     int logical_block = metadata->blocks[i];
 
+    char *read_buffer = NULL;
+    char *hash = NULL;
+    char *physical_block_from_hash = NULL;
+
     // Lee el contenido del bloque físico asociado al bloque lógico
     char logical_block_path[PATH_MAX];
     snprintf(logical_block_path, sizeof(logical_block_path),
              "%s/files/%s/%s/logical_blocks/%04d.dat",
              g_storage_config->mount_point, name, tag, logical_block);
 
-    char *read_buffer = (char *)malloc(g_storage_config->block_size);
+    read_buffer = (char *)malloc(g_storage_config->block_size);
     if (read_buffer == NULL) {
       log_error(g_storage_logger,
                 "## Query ID: %" PRIu32
                 " - Error de asignación de memoria para leer el bloque: %s",
                 query_id, logical_block_path);
       retval = -2;
-      goto unlock_hash_index;
+      goto cleanup_all;
     }
 
     if (read_block_content(query_id, logical_block_path,
                            g_storage_config->block_size, read_buffer) < 0) {
       retval = -3;
-      goto cleanup_buffer;
+      goto cleanup_loop;
     }
 
     // Hashea el contenido del bloque leído
-    char *hash = crypto_md5(read_buffer, (size_t)g_storage_config->block_size);
+    hash = crypto_md5(read_buffer, (size_t)g_storage_config->block_size);
     if (hash == NULL) {
-      log_error(g_storage_config,
+      log_error(g_storage_logger,
                 "## Query ID: %" PRIu32
                 " - No se generó el hash para el bloque %s",
                 query_id, logical_block_path);
       retval = -3;
-      goto cleanup_buffer;
+      goto cleanup_loop;
     }
 
     free(read_buffer);
+    read_buffer = NULL;
 
-    // Si blocks_hash_index contiene el hash, elimina el archivo del bloque
-    // lógico actual y lo vuelve a crear como hardlink del bloque físico
-    // registrado en blocks_hash_index
+    // Obtiene el bloque físico vinculado al actual bloque lógico de la
+    // iteración
+    char physical_block_from_logical_path[PATH_MAX];
+    if (get_current_physical_block(query_id, logical_block_path,
+                                   physical_block_from_logical_path) < 0) {
+      retval = -4;
+      goto cleanup_loop;
+    }
+
+    // Verifica que blocks_hash_index contenga el hash
     if (config_has_property(hash_index_config, hash)) {
-      char *physical_block_from_hash =
+      // Obtiene el bloque físico vinculado al hash en hash index config
+      physical_block_from_hash =
           strdup(config_get_string_value(hash_index_config, hash));
 
-      char physical_block_from_logical_path[PATH_MAX];
-      if (get_current_physical_block(query_id, logical_block_path,
-                                     physical_block_from_logical_path) < 0) {
-        retval = -4;
-        goto cleanup_buffer;
-      }
-
+      // Si ambos bloques físicos son diferentes, debe deduplicar
       if (strcmp(physical_block_from_hash, physical_block_from_logical_path) !=
           0) {
         // El hash existe, pero apunta a otro bloque físico. Reasignamos el
@@ -242,8 +255,7 @@ int deduplicate_blocks(uint32_t query_id, const char *name, const char *tag,
                   " - Bloque %s es DUPLICADO. Reasignando a bloque físico %s.",
                   query_id, logical_block_path, physical_block_from_hash);
 
-        // Esta función DEBE manejar la liberación del bloque físico *anterior*
-        // si ya no tiene referencias
+        // Redirige el hardlink del bloque lógico al bloque físico existente
         if (update_logical_block_link(query_id, logical_block_path,
                                       physical_block_from_hash) < 0) {
           log_error(g_storage_logger,
@@ -251,9 +263,11 @@ int deduplicate_blocks(uint32_t query_id, const char *name, const char *tag,
                     " - Fallo en la reasignación del link para %s.",
                     query_id, logical_block_path);
           retval = -5;
-          goto cleanup_buffer;
+          goto cleanup_loop;
         }
 
+        // Maneja la liberación del bloque físico anterior (si ya no tiene
+        // referencias)
         if (update_ph_block_status_in_bitmap(
                 query_id, physical_block_from_logical_path) < 0) {
           log_error(g_storage_logger,
@@ -262,32 +276,54 @@ int deduplicate_blocks(uint32_t query_id, const char *name, const char *tag,
                     "en el bitmap.",
                     query_id, physical_block_from_logical_path);
           retval = -6;
-          goto cleanup_buffer;
+          goto cleanup_loop;
         }
 
         log_info(g_storage_logger,
                  "## Query ID: %" PRIu32
-                 " - %s:%s - Bloque Lógico %s se reasigna de %s a %s",
+                 " - %s:%s - Bloque Lógico %d se reasigna de %s a %s",
                  query_id, name, tag, logical_block,
                  physical_block_from_logical_path, physical_block_from_hash);
 
       } else {
-        // El hash ya está en el índice y apunta al bloque físico correcto. No
-        // hacer nada.
+        // El hash ya está en el índice y apunta al bloque físico correcto
         log_info(g_storage_logger,
                  "## Query ID: %" PRIu32
                  " - Bloque %s ya está correctamente asociado.",
                  query_id, logical_block_path);
       }
+
+      if (physical_block_from_hash)
+        free(physical_block_from_hash);
+      physical_block_from_hash = NULL;
+
+    } else {
+      // Registro del nuevo Hash
+      config_set_value(hash_index_config, hash,
+                       physical_block_from_logical_path);
+
+      log_info(g_storage_logger,
+               "## Query ID: %" PRIu32 " - Hash registrado para el bloque "
+                                       "físico %s en blocks hash index config.",
+               query_id, physical_block_from_logical_path);
     }
+
+  cleanup_loop:
+    if (hash)
+      free(hash);
+    if (read_buffer)
+      free(read_buffer);
+
+    if (retval < 0)
+      goto cleanup_all;
   }
 
-cleanup_buffer:
-  if (read_buffer)
-    free(read_buffer);
-unlock_hash_index:
+  config_save(hash_index_config);
+
+cleanup_all:
   if (hash_index_config)
     destroy_config(hash_index_config);
+unlock_hash_index:
   pthread_mutex_unlock(g_blocks_hash_index_mutex);
 end:
   return retval;
@@ -345,7 +381,6 @@ int get_current_physical_block(uint32_t query_id,
   DIR *blocks_dir;
   struct dirent *entry;
   char physical_block_path[PATH_MAX];
-  char *physical_block_name = NULL;
 
   // Obtener el i-node del bloque lógico (hard link)
   if (stat(logical_block_path, &logical_stat) < 0) {
@@ -358,9 +393,9 @@ int get_current_physical_block(uint32_t query_id,
 
   // Abrir el directorio que contiene todos los bloques físicos
   char physical_blocks_path[PATH_MAX];
-  snprintf(physical_block_path, size_of(physical_blocks_path),
+  snprintf(physical_blocks_path, sizeof(physical_blocks_path),
            "%s/physical_blocks/", g_storage_config->mount_point);
-  blocks_dir = opendir(physical_block_path);
+  blocks_dir = opendir(physical_blocks_path);
   if (blocks_dir == NULL) {
     log_error(g_storage_logger,
               "## Query ID: %" PRIu32
@@ -391,8 +426,10 @@ int get_current_physical_block(uint32_t query_id,
 
     // Comparar i-nodes
     if (logical_stat.st_ino == physical_stat.st_ino) {
-      // Devolver el nombre del archivo físico (ej: "block0042")
-      physical_block_name = strdup(entry->d_name);
+      // Devolver el nombre del archivo físico
+      strncpy(physical_block_name, entry->d_name, PATH_MAX);
+      physical_block_name[PATH_MAX - 1] = '\0';
+
       log_debug(g_storage_logger,
                 "Bloque lógico %s apunta al bloque físico: %s",
                 logical_block_path, physical_block_name);
@@ -442,21 +479,22 @@ int update_logical_block_link(uint32_t query_id, const char *logical_block_path,
               " - No se pudo crear el hard link de %s a %s.",
               query_id, physical_block_path, logical_block_path);
     return -2;
-    goto end;
   }
 
   log_debug(g_storage_logger,
             "## Query ID: %" PRIu32 " - Se agregó el hardlink del "
-            "bloque lógico %d al bloque físico %s",
+            "bloque lógico %s al bloque físico %s",
             query_id, logical_block_path, physical_block_path);
+
+  return 0;
 }
 
 int update_ph_block_status_in_bitmap(uint32_t query_id,
                                      char *physical_block_name) {
   // Obtenemos el número de referencias (links) del bloque físico
   char physical_block_path[PATH_MAX];
-  snprintf(physical_block_path, size_of(physical_block_path),
-           "%s/physical_blocks/%s", g_stroage_config->mount_point,
+  snprintf(physical_block_path, sizeof(physical_block_path),
+           "%s/physical_blocks/%s", g_storage_config->mount_point,
            physical_block_name);
 
   int numb_links = ph_block_links(physical_block_path);
@@ -501,7 +539,7 @@ int update_ph_block_status_in_bitmap(uint32_t query_id,
   if (bitmap_load(&bitmap, &bitmap_buffer) < 0) {
     log_error(g_storage_logger,
               "# Query ID: %" PRIu32 " - Fallo al cargar el bitmap.", query_id);
-    return = -3;
+    return -3;
   }
 
   bitarray_set_bit(bitmap, (off_t)physical_block_id);
