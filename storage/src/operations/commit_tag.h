@@ -39,7 +39,7 @@ int execute_tag_commit(uint32_t query_id, const char *name, const char *tag);
  * @param query_id Puntero a uint32_t donde se almacenará el ID de la query.
  * @param name Puntero a puntero (char**) donde se almacenará el nombre (malloc-ed).
  * @param tag Puntero a puntero (char**) donde se almacenará el tag (malloc-ed).
- * @return int 0 en caso de éxito, -1 en caso de error de deserialización.
+ * @return int 0 en caso de éxito, o un valor negativo en caso de error de deserialización.
  */
 int deserialize_tag_commit_request(t_package *package, uint32_t *query_id, char **name, char **tag);
 
@@ -114,7 +114,7 @@ int update_logical_block_link(uint32_t query_id, const char *logical_block_path,
  * @param physical_block_name Nombre del bloque físico a verificar (ej: "block0042").
  * @return int 0 si no requiere liberación o se liberó correctamente, o un valor negativo en caso de error.
  */
-int update_ph_block_status_in_bitmap(uint32_t query_id,
+int free_ph_block_if_unused(uint32_t query_id,
                                      char *physical_block_name);
 
 #endif
