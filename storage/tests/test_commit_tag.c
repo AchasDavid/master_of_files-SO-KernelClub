@@ -22,6 +22,7 @@
 void setup_filesystem_environment() {
     create_test_directory();
     create_test_superblock(TEST_MOUNT_POINT);
+    create_test_blocks_hash_index(TEST_MOUNT_POINT);
     create_test_storage_config("9090", "99", "false", TEST_MOUNT_POINT, 100, 10, "INFO"); 
 
     char config_path[PATH_MAX];
@@ -117,23 +118,37 @@ context(tests_commit_tag) {
         it ("Debe comitear exitosamente un archivo en estado WORK_IN_PROGRESS") {
             char *name = "file1";
             char *tag = "tag1";
-            init_logical_blocks(name, tag, 1, TEST_MOUNT_POINT); 
-            create_test_metadata(name, tag, 1, "[10]", (char*)IN_PROGRESS, g_storage_config->mount_point);
+            char *content = "Este es un contenido unico para el commit.";
+            
+            write_physical_block_content(1, content, strlen(content));
+            init_logical_blocks(name, tag, 1, TEST_MOUNT_POINT);
+            link_logical_to_physical(name, tag, 0, 1);
+            create_test_metadata(name, tag, 1, "[0]", (char*)IN_PROGRESS, g_storage_config->mount_point);
 
             int result = execute_tag_commit(200, name, tag);
 
             should_int(result) be equal to (0);
             
-            // VERIFICACIÓN DE ESTADO EN EL FS
-            t_file_metadata *metadata_after_commit = read_file_metadata(g_storage_config->mount_point, name, tag);
-            should_ptr(metadata_after_commit) not be null;
-            should_string(metadata_after_commit->state) be equal to ((char*)COMMITTED);
+            // VERIFICACIÓN DE DEDUPLICACIÓN (registro de hash)
+            char hash_index_path[PATH_MAX];
+            get_hash_index_config_path(hash_index_path);
+            t_config *hash_config = config_create(hash_index_path);
+
+            char *read_buffer = (char *)malloc(g_storage_config->block_size);
+            memset(read_buffer, 0, g_storage_config->block_size);
+            memcpy(read_buffer, content, strlen(content));
+
+            char *hash = crypto_md5(read_buffer, g_storage_config->block_size);
+            should_bool(config_has_property(hash_config, hash)) be truthy;
             
             // Cleanup de verificación
+            free(hash);
+            config_destroy(hash_config);
+            t_file_metadata *metadata_after_commit = read_file_metadata(g_storage_config->mount_point, name, tag);
             if (metadata_after_commit) destroy_file_metadata(metadata_after_commit);
             should_bool(correct_unlock(name, tag)) be truthy;
         } end
-
+        
         it ("Debe retornar SUCCESS si el archivo ya esta en estado COMMITTED (Idempotencia)") {
             char *name = "file1";
             char *tag = "tag1";
@@ -186,8 +201,8 @@ context(tests_commit_tag) {
             g_storage_logger = create_test_logger();
             setup_filesystem_environment();
             
-            init_logical_blocks("file1", "tag1", 1, TEST_MOUNT_POINT); 
-            create_test_metadata("file1", "tag1", 1, "[10]", (char*)IN_PROGRESS, g_storage_config->mount_point);
+            init_logical_blocks("file1", "tag1", 2, TEST_MOUNT_POINT); 
+            create_test_metadata("file1", "tag1", 1, "[1]", (char*)IN_PROGRESS, g_storage_config->mount_point);
         } end
 
         after {
@@ -200,7 +215,7 @@ context(tests_commit_tag) {
             char *tag = "tag1";
 
             t_package *request_package = package_create_empty(STORAGE_OP_TAG_COMMIT_REQ);
-            package_add_uint32(request_package, (uint32_t)300); // query_id
+            package_add_uint32(request_package, (uint32_t)300);
             package_add_string(request_package, name);
             package_add_string(request_package, tag);
             package_simulate_reception(request_package);

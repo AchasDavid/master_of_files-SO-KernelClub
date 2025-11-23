@@ -197,4 +197,12 @@ int mutex_is_free(pthread_mutex_t *mutex);
  */
 void package_simulate_reception(t_package *package);
 
+void write_physical_block_content(int physical_id, const char *content, size_t content_size);
+
+void link_logical_to_physical(const char *name, const char *tag, int logical_id, int physical_id);
+
+char* get_hash_index_config_path(char *buffer);
+
+int create_test_blocks_hash_index(const char* mount_point);
+
 #endif

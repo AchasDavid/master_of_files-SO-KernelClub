@@ -117,6 +117,21 @@ int create_test_superblock(const char* mount_point) {
     return 0;
 }
 
+int create_test_blocks_hash_index(const char* mount_point) {
+    char hash_index_path[PATH_MAX];
+    snprintf(hash_index_path, sizeof(hash_index_path), "%s/blocks_hash_index.config", mount_point);
+
+    FILE* hash_index_file = fopen(hash_index_path, "w");
+    if (hash_index_file == NULL) {
+        return -1;
+    }
+
+    // Archivo vacío para iniciar
+    fclose(hash_index_file);
+
+    return 0;
+}
+
 int create_test_storage_config(
     char *storage_ip, 
     char *storage_port, 
@@ -232,3 +247,49 @@ void package_simulate_reception(t_package *package)
     
     package_reset_read_offset(package);
 }
+
+void write_physical_block_content(int physical_id, const char *content, size_t content_size) {
+    char ph_block_path[PATH_MAX];
+    snprintf(ph_block_path, sizeof(ph_block_path), "%s/physical_blocks/block%04d.dat", 
+             TEST_MOUNT_POINT, physical_id);
+    
+    FILE *f = fopen(ph_block_path, "w");
+    if (f) {
+        fwrite(content, 1, content_size, f);
+        // Rellenar con ceros para alcanzar block_size para el hashing (asumiendo block_size=100)
+        size_t block_size = g_storage_config->block_size;
+        if (content_size < block_size) {
+            printf("hola4\n");
+            char *zeros = calloc(1, block_size - content_size);
+            fwrite(zeros, 1, block_size - content_size, f);
+            printf("hola5\n");
+            free(zeros);
+        }
+        fclose(f);
+    }
+}
+
+void link_logical_to_physical(const char *name, const char *tag, int logical_id, int physical_id) {
+    // Rutas de bloques
+    char ph_block_path[PATH_MAX];
+    snprintf(ph_block_path, sizeof(ph_block_path), "%s/physical_blocks/block%04d.dat", 
+             TEST_MOUNT_POINT, physical_id);
+
+    char lg_block_path[PATH_MAX];
+    snprintf(lg_block_path, sizeof(lg_block_path), "%s/files/%s/%s/logical_blocks/%04d.dat", 
+             TEST_MOUNT_POINT, name, tag, logical_id);
+
+    // Eliminar el link viejo si existe (importante para la reasignación)
+    remove(lg_block_path); 
+    
+    // Crear el hard link nuevo
+    if (link(ph_block_path, lg_block_path) != 0) {
+        log_error(g_storage_logger, "Falló la creación del hardlink en el setup.");
+    }
+}
+
+char* get_hash_index_config_path(char *buffer) {
+    snprintf(buffer, PATH_MAX, "%s/blocks_hash_index.config", TEST_MOUNT_POINT);
+    return buffer;
+}
+
