@@ -32,7 +32,7 @@ context(tests_write_block) {
             int retval = deserialize_block_write_request(package, &query_id, &name, &tag, &block_number, &block_content);
             should_int(retval) be equal to (0);
 
-            if (package) free(package);
+            if (package) package_destroy(package);
             if (name) free(name);
             if (tag) free(tag);
             if (block_content) free(block_content);
