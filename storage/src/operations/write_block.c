@@ -151,6 +151,8 @@ int write_to_logical_block(uint32_t query_id, const char *file_name,
     return -1;
   }
 
+  usleep(g_storage_config->block_access_delay * 1000);
+
   size_t bytes_written = fwrite(block_content, sizeof(char),
                                 g_storage_config->block_size, block_file);
   if (bytes_written != g_storage_config->block_size) {
