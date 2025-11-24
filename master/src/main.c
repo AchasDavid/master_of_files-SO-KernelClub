@@ -78,6 +78,7 @@ int main(int argc, char* argv[]) {
     
     // Inicio el servidor
     int server_socket_fd = start_server(master->ip, master->port);
+    master->running = true;
 
     // Inicio hilo aging (si estoy en priotidad)
     if(strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
@@ -128,6 +129,7 @@ int main(int argc, char* argv[]) {
         }
 
         pthread_detach(client_thread);
+        pthread_detach(master->aging_thread);
     }
 
 clean:

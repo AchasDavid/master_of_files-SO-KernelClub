@@ -10,7 +10,7 @@ static int search_worker_id = -1;
 void *aging_thread_func(void *arg) {
     t_master *master = (t_master*) arg;
 
-    while (1) {
+    while (master->running) {
         // Definir cada cuanto se hace la verificación, un tiempo fijo (100ms, 250ms)
         // o una fracción del aging interval (10 veces cada intervalo)
         usleep(master->aging_interval * 100); // -> Por ahora, 10 verificaciones por intervalo
@@ -80,7 +80,7 @@ void *aging_thread_func(void *arg) {
             list_sort(master->queries_table->ready_queue, _qcb_priority_compare);
         }
 
-        //pthread_mutex_unlock(&master->queries_table->query_table_mutex);
+        pthread_mutex_unlock(&master->queries_table->query_table_mutex);
 
         check_preemption(master);
     }
@@ -91,7 +91,7 @@ void *aging_thread_func(void *arg) {
 void check_preemption(t_master *master) {
 
     pthread_mutex_lock(&master->workers_table->worker_table_mutex);
-    //pthread_mutex_lock(&master->queries_table->query_table_mutex);
+    pthread_mutex_lock(&master->queries_table->query_table_mutex);
 
     // Nada para hacer si no hay running o no hay ready
     if(list_is_empty(master->workers_table->busy_list) ||
