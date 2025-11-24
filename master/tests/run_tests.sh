@@ -38,6 +38,8 @@ run_test "Query Management" "./criterion/unit/test_query_management"
 run_test "Worker Management" "./criterion/unit/test_worker_management"
 run_test "Cleanup" "./criterion/unit/test_cleanup"
 
+run_test "Disconnection" "./criterion/disconnection/test_disconnection"
+
 # Scheduler tests
 run_test "Scheduler FIFO" "./criterion/scheduler/test_scheduler_fifo"
 run_test "Scheduler PRIORITY" "./criterion/scheduler/test_scheduler_priority"
