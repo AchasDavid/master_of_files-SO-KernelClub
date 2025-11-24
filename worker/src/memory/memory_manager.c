@@ -230,7 +230,7 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     t_log *logger = logger_get();
     if (logger)
     {
-        log_info(logger, "Query %d: - Memoria Miss - File: %s - Tag: %s - Pagina: %d",
+        log_info(logger, "Query %d: Memoria Miss - File: %s - Tag: %s - Pagina: %d",
                  mm->query_id, file, tag, page_number);
     }
 
@@ -277,11 +277,11 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     if (logger)
     {
         log_info(logger,
-                 "## Query %d: Se asigna el Marco: %d a la Página: %d perteneciente al - File: %s - Tag: %s",
+                 "Query %d: Se asigna el Marco: %d a la Página: %d perteneciente al File: %s Tag: %s",
                  mm->query_id, frame, page_number, file, tag);
 
         log_info(logger,
-                 "## Query %d: - Memoria Add - File: %s - Tag: %s - Pagina: %d - Marco: %d",
+                 "Query %d: Memoria Add - File: %s - Tag: %s - Pagina: %d - Marco: %d",
                  mm->query_id, file, tag, page_number, frame);
     }
 
@@ -743,7 +743,7 @@ int mm_find_lru_victim(memory_manager_t *mm)
         if (logger)
         {
             log_info(logger,
-                     "## Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
+                     "Query %d: Se libera el Marco: %d perteneciente al File: %s Tag: %s",
                      mm->query_id, victim_frame, victim_file, victim_tag);
         }
 
@@ -858,7 +858,7 @@ int mm_find_clockm_victim(memory_manager_t *mm)
                 if (logger)
                 {
                     log_info(logger,
-                             "## Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
+                             "Query %d: Se libera el Marco: %d perteneciente al File: %s Tag: %s",
                              mm->query_id, idx, entry->file, entry->tag);
                 }
 
@@ -963,7 +963,7 @@ int mm_find_clockm_victim(memory_manager_t *mm)
             if (logger)
             {
                 log_info(logger,
-                         "## Query %d: Se libera el Marco: %d perteneciente al - File: %s - Tag: %s",
+                         "Query %d: Se libera el Marco: %d perteneciente al File: %s Tag: %s",
                          mm->query_id,
                          dirty_candidate_frame,
                          dirty_entry->file,
