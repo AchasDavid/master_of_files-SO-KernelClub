@@ -96,7 +96,7 @@ static void eject_query(t_package *pkg, worker_state_t *state)
 
             mm_flush_all_dirty(state->memory_manager);
             
-            t_package *resp = package_create(OP_WORKER_EVICT_RES);
+            t_package *resp = package_create_empty(OP_WORKER_EVICT_RES);
             package_add_uint32(resp, query_id);
             package_add_uint32(resp, pc);
             package_send(resp, state->master_socket);

@@ -88,10 +88,9 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
     pthread_mutex_unlock(&state->mux);
     if (eject_before_fetch)
     {
-        // Flush de todos los File:Tag modificados antes del desalojo
         mm_flush_all_dirty(state->memory_manager);
 
-        t_package *res = package_create(OP_WORKER_EVICT_RES);
+        t_package *res = package_create_empty(OP_WORKER_EVICT_RES);
         package_add_uint32(res, ctx->query_id);
         package_add_uint32(res, ctx->program_counter);
         package_send(res, state->master_socket);
@@ -142,13 +141,13 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
         // Flush de todos los File:Tag modificados antes del desalojo
         mm_flush_all_dirty(state->memory_manager);
 
-        t_package *res = package_create(OP_WORKER_EVICT_RES);
+        t_package *res = package_create_empty(OP_WORKER_EVICT_RES);
         package_add_uint32(res, ctx->query_id);
         package_add_uint32(res, ctx->program_counter);
         package_send(res, state->master_socket);
         package_destroy(res);
 
-        log_info(state->logger, "## Query %d: Desalojada por pedido de Master - PC=%d", ctx->query_id, ctx->program_counter);
+        log_info(state->logger, "## Query %d: Desalojada por pedido del Master - PC=%d", ctx->query_id, ctx->program_counter);
         return QUERY_RESULT_EJECT;
     }
 
