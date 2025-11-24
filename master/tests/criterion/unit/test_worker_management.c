@@ -1,4 +1,5 @@
 #include <criterion/criterion.h>
+#include <commons/collections/list.h>
 #include "../../../src/init_master.h"
 #include "../../../src/query_control_manager.h"
 #include "../../helpers/test_helpers.h"
@@ -63,8 +64,8 @@ Test(worker_management, worker_initial_state_idle) {
     cr_assert_eq(wcb->current_query_id, -1);
     
     // Verificar que está en idle_list, no en busy_list
-    cr_assert(list_contains(master->workers_table->idle_list, wcb));
-    cr_assert_not(list_contains(master->workers_table->busy_list, wcb));
+    cr_assert(list_remove_element(master->workers_table->idle_list, wcb));
+    cr_assert_not(list_remove_element(master->workers_table->busy_list, wcb));
     
     destroy_fake_master(master);
 }
