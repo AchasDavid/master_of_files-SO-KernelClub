@@ -1,2 +1,2 @@
 #!/bin/bash
-./scripts/apply_config.sh "./src/config/storage.config" "PRIORITY" 0
+./scripts/apply_config.sh "./src/config/master.config" "PRIORITY" 0

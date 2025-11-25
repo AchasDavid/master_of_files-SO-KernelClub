@@ -1,17 +1,11 @@
 #!/bin/bash
 
-# ============================================================================
-# Script: apply_planificacion.sh
-# Uso:
-#   ./apply_planificacion.sh <config_path> <algoritmo> <aging>
-# ============================================================================
-
 CONFIG_PATH="$1"
 ALGORITMO="$2"
 AGING="$3"
 
 if [ -z "$CONFIG_PATH" ] || [ -z "$ALGORITMO" ] || [ -z "$AGING" ]; then
-    echo "Uso: ./apply_planificacion.sh <config_path> <ALGORITMO_PLANIFICACION> <TIEMPO_AGING>"
+    echo "Uso: .$0 <config_path> <ALGORITMO_PLANIFICACION> <TIEMPO_AGING>"
     exit 1
 fi
 
