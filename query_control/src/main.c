@@ -209,11 +209,11 @@ int main(int argc, char* argv[])
         } break;
 
         case QC_OP_MASTER_FIN_DESCONEXION:
-        case QC_OP_MASTER_FIN_PRIORIDAD: {
+        case OP_MASTER_QUERY_END: {
 
 
             const char* motivoString =
-            (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "PRIORIDAD";
+            (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "finalización de Query";
 
             log_info(logger, "## Query Finalizada - %s", motivoString);
 

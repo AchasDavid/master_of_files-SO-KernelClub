@@ -401,13 +401,16 @@ void cleanup_worker_resources(t_worker_control_block *wcb, t_master *master) {
     if (master->workers_table) {
         list_remove_element(master->workers_table->idle_list, wcb);
         list_remove_element(master->workers_table->busy_list, wcb);
-        list_remove_element(master->workers_table->disconnected_list, wcb);
         list_remove_element(master->workers_table->worker_list, wcb);
         
         // Decrementar contador
         if (master->workers_table->total_workers_connected > 0) {
             master->workers_table->total_workers_connected--;
+            master->multiprogramming_level = master->workers_table->total_workers_connected;
         }
+
+        // Agregar a lista worker desconectados
+        list_add(master->workers_table->disconnected_list, wcb);
     }
 
     if (wcb->ip_address) {

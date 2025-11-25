@@ -41,8 +41,6 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     package_read_uint8(response_package, &query_priority);
 
     int assigned_id = generate_query_id(master);
-    int multiprocessing_level = master->multiprogramming_level; // TODO: Asignar el nivel real cuando esté implementado
-    
     // Responder a QC
     t_package *query_path_package = package_create_empty(OP_QUERY_FILE_PATH);
 
@@ -54,7 +52,7 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
     package_send(query_path_package, client_socket);
 
     // Loggear la información recibida
-    log_info(master->logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_path, query_priority, assigned_id, multiprocessing_level);
+    log_info(master->logger, "## Se conecta un Query Control para ejecutar la Query path:%s con prioridad %d - Id asignado: %d. Nivel multiprocesamiento %d", query_path, query_priority, assigned_id, master->multiprogramming_level);
     
     // Agregar a la tabla de queries
     t_query_control_block *qcb = create_query(master, assigned_id, query_path, query_priority, client_socket);

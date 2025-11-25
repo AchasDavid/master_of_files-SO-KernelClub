@@ -4,6 +4,7 @@
 #include "connection/serialization.h"
 #include "scheduler.h"
 #include <commons/collections/list.h>
+#include <unistd.h>
 
 
 int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *master) {
@@ -23,6 +24,7 @@ int manage_worker_handshake(t_buffer *buffer, int client_socket, t_master *maste
         return -1;
     }
     log_info(master->logger, "Worker ID: %s registrado exitosamente", worker_id);
+    master->multiprogramming_level = master->workers_table->total_workers_connected;
     log_debug(master->logger, "Total Workers conectados: %d", master->workers_table->total_workers_connected);
 
     // Envío ACK al Worker
@@ -139,23 +141,7 @@ t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, in
     return wcb;
 }
 
-/**
- * handler OP_WORKER_END_QUERY desde un Worker
- * Paquete esperado:
- *   uint32 worker_id
- *   uint32 query_id
- *
- * Comportamiento:
- *  - Verificar worker por socket
- *  - Verificar qcb en running_list
- *  - Notificar al QC (OP_MASTER_QUERY_END)
- *  - Log obligatorio
- *  - Responder ACK al Worker (OP_WORKER_ACK)
- *  - Poner worker IDLE, current_query_id = -1
- *  - Remover qcb de running_list y destruir recursos
- *  - Llamar a try_dispatch
- */
-/* int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *master) {
+int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *master) {
     if (!buffer || !master) {
         log_error(master ? master->logger : NULL, "[manage_worker_end_query] Parámetros inválidos.");
         return -1;
@@ -167,7 +153,6 @@ t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, in
     buffer_read_uint32(buffer, &worker_id);
     buffer_read_uint32(buffer, &query_id);
 
-    // Buscar worker por socket (coincide con tu approach en manage_read_message...)
     t_worker_control_block *worker = NULL;
     for (int i = 0; i < list_size(master->workers_table->worker_list); i++) {
         t_worker_control_block *aux = list_get(master->workers_table->worker_list, i);
@@ -178,9 +163,7 @@ t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, in
     }
 
     if (worker == NULL) {
-        log_error(master->logger, "[manage_worker_end_query] No se encontró worker para socket=%d (worker_id=%u).", client_socket, worker_id);
-        // intentar aun así enviar ACK al worker (si queremos), pero devolvemos error
-        return -1;
+        log_error(master->logger, "[manage_worker_end_query] No se encontró worker para socket=%d (worker_id=%u).", client_socket, worker_id);        return -1;
     }
 
     // Buscar la query en la running_list
@@ -211,25 +194,17 @@ t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, in
         t_package *resp = package_create_empty(OP_MASTER_QUERY_END);
         if (resp) {
             package_add_uint32(resp, (uint32_t) qcb->query_id);
-            // Si tu Worker envía un resultado, podés agregarlo aquí antes de enviar.
             if (package_send(resp, qcb->socket_fd) != 0) {
                 log_error(master->logger, "[manage_worker_end_query] Error al enviar resultado final a QC (Query ID=%d, socket=%d).",
                           qcb->query_id, qcb->socket_fd);
             }
             package_destroy(resp);
         }
-        // según spec: cerrar socket del QC cuando se entrega resultado final
-        close(qcb->socket_fd);
+        close(qcb->socket_fd); // Libero el socket
     }
 
-    // Quitar qcb de running_list
-    bool removed = list_remove_by_condition(master->queries_table->running_list, (void *) (size_t) qcb);
-    // Si no tenés list_remove_by_condition, buscá el índice y list_remove
-    // (Ajustalo según tu API de commons/collections)
-    // Liberar recursos de la query (ajustar a la función real que tengas)
-    // Aquí asumimos query_destroy(qcb)
-    query_destroy(qcb);
-
+    // TODO: Sacar de READY queue y limpiar recursos
+    
     // Responder ACK al Worker
     t_package *ack = package_create_empty(OP_WORKER_ACK);
     if (ack) {
@@ -238,11 +213,14 @@ t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, in
     }
 
     // Poner worker IDLE y limpiar current_query_id
+    pthread_mutex_lock(&master->workers_table->worker_table_mutex);
     worker->state = WORKER_STATE_IDLE;
     worker->current_query_id = -1;
+    list_add(master->workers_table->idle_list, worker);
+    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
 
     // Intentar despachar la siguiente query
     try_dispatch(master);
 
     return 0;
-} */
+}

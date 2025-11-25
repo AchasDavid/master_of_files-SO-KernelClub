@@ -204,6 +204,12 @@ void* handle_client(void* arg) {
                     log_error(master->logger, "Error al manejar OP_WORKER_READ_MESSAGE del cliente %d", client_socket);
                 }
                 break;
+            case OP_WORKER_END_QUERY:
+                log_debug(master->logger, "Recibido OP_WORKER_END_QUERY en socket %d", client_socket);
+                if (manage_worker_end_query(required_package->buffer, client_socket, master) != 0) {
+                    log_error(master->logger, "Error al manejar OP_WORKER_END_QUERY desde socket %d", client_socket);
+                }
+                break;
             case WORKER_OP_DISCONNECTION:
                 log_info(master->logger, "Recibido WORKER_OP_DISCONNECTION de socket %d", client_socket);
                 handle_worker_disconnection(client_socket, master);
