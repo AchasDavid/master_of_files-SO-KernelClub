@@ -75,7 +75,7 @@ static void assign_query(t_package *pkg, worker_state_t *state)
     pthread_mutex_unlock(&state->mux);
     pthread_cond_signal(&state->new_query_cond);
 
-    log_info(state->logger, "## Se asignó Query %d - Program Counter=%d - Ruta=%s", query_id, program_counter, path);
+    log_info(state->logger, "## Query %d: Se recibe la Query. El path de operaciones es: %s", query_id, path);
     free(path);
 }
 
