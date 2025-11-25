@@ -129,7 +129,6 @@ int main(int argc, char* argv[]) {
         }
 
         pthread_detach(client_thread);
-        pthread_detach(master->aging_thread);
     }
 
 clean:

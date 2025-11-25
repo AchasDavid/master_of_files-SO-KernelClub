@@ -56,31 +56,23 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
         return -1;
     }
 
-    // Buscar el worker asociado a este socket (recorro lista de workers registrados)
-    t_worker_control_block *worker = NULL;
-    for (int i = 0; i < list_size(master->workers_table->worker_list); i++) {
-        t_worker_control_block *aux_wcb = list_get(master->workers_table->worker_list, i);
-        if (aux_wcb->socket_fd == client_socket) {
-            worker = aux_wcb;
-            break;
-        }
-    }
+    uint32_t worker_id;
+    uint32_t query_id;
+    void *data = NULL;
+    size_t size;
 
-    if (worker == NULL) {
-        log_error(master->logger, "[manage_read_message_from_worker] No se encontró worker asociado al socket %d.", client_socket);
-        return -1;
-    }
+    buffer_reset_offset(buffer);
+    buffer_read_uint32(buffer, &worker_id);
+    buffer_read_uint32(buffer, &query_id);
+    data = buffer_read_data(buffer, &size);
 
-    if (worker->current_query_id < 0) {
-        log_warning(master->logger, "[manage_read_message_from_worker] Worker ID=%d no tiene query asociada actualmente.", worker->worker_id);
-        return 0;
-    }
+    log_debug(master->logger, "Recibido lectura desde worker id: %d para renviar a query id: %d. Data= %s", worker_id, query_id, data);
 
     // Buscar la query correspondiente al ID
     t_query_control_block *query = NULL;
     for (int i = 0; i < list_size(master->queries_table->running_list); i++) {
         t_query_control_block *aux_qcb = list_get(master->queries_table->running_list, i);
-        if (aux_qcb->query_id == worker->current_query_id) {
+        if (aux_qcb->query_id == query_id) {
             query = aux_qcb;
             break;
         }
@@ -88,33 +80,22 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
 
     if (query == NULL) {
         log_error(master->logger, "[manage_read_message_from_worker] No se encontró query ID=%d asociada al worker ID=%d.",
-                  worker->current_query_id, worker->worker_id);
+                  query_id, worker_id);
         return -1;
     }
+
 
     // Crear paquete a reenviar al Query Control
     t_package *package_to_query = package_create_empty(QC_OP_READ_DATA);
     if (!package_to_query) {
-        log_error(master->logger, "[manage_read_message_from_worker] Error al crear paquete para reenviar a Query Control (Query ID=%d).",
-                  query->query_id);
+        log_error(master->logger, "[manage_read_message_from_worker] Error al crear paquete para reenviar a Query Control");
         return -1;
     }
 
     // Copiar el contenido del buffer recibido del Worker al nuevo paquete
-    // Asumo que el buffer contiene un string (mensaje leido).
-    // TODO: Verificar si el buffer puede contener otro tipo de datos, en tal caso usar:
-    // package_add_data()
-    buffer_reset_offset(buffer);
-    char *msg = buffer_read_string(buffer);
-    if (msg == NULL) {
-        log_error(master->logger, "[manage_read_message_from_worker] Error al leer string del buffer del Worker ID=%d.",
-                  worker->worker_id);
-        package_destroy(package_to_query);
-        return -1;
-    }
-    if (package_add_string(package_to_query, msg) != 0) {
+    if (!package_add_data(package_to_query, data, size)) {
         log_error(master->logger, "[manage_read_message_from_worker] Error al copiar buffer de Worker ID=%d hacia Query ID=%d.",
-                  worker->worker_id, query->query_id);
+                  worker_id, query_id);
         package_destroy(package_to_query);
         return -1;
     }
@@ -122,17 +103,17 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
     // Enviar el paquete al Query Control
     if (package_send(package_to_query, query->socket_fd) != 0) {
         log_error(master->logger, "[manage_read_message_from_worker] Error al reenviar mensaje de Worker ID=%d hacia Query ID=%d (socket=%d).",
-                  worker->worker_id, query->query_id, query->socket_fd);
+                  worker_id, query->query_id, query->socket_fd);
         package_destroy(package_to_query);
         return -1;
     }
 
     log_debug(master->logger, "[manage_read_message_from_worker] Mensaje reenviado de Worker ID=%d → Query ID=%d correctamente.",
-              worker->worker_id, query->query_id);
+              worker_id, query->query_id);
 
     // Liberar memoria
     package_destroy(package_to_query);
-    free(msg);
+    free(data);
     return 0;
 }
 
@@ -157,3 +138,111 @@ t_worker_control_block *create_worker(t_worker_table *table, char *worker_id, in
     pthread_mutex_unlock(&table->worker_table_mutex);
     return wcb;
 }
+
+/**
+ * handler OP_WORKER_END_QUERY desde un Worker
+ * Paquete esperado:
+ *   uint32 worker_id
+ *   uint32 query_id
+ *
+ * Comportamiento:
+ *  - Verificar worker por socket
+ *  - Verificar qcb en running_list
+ *  - Notificar al QC (OP_MASTER_QUERY_END)
+ *  - Log obligatorio
+ *  - Responder ACK al Worker (OP_WORKER_ACK)
+ *  - Poner worker IDLE, current_query_id = -1
+ *  - Remover qcb de running_list y destruir recursos
+ *  - Llamar a try_dispatch
+ */
+/* int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *master) {
+    if (!buffer || !master) {
+        log_error(master ? master->logger : NULL, "[manage_worker_end_query] Parámetros inválidos.");
+        return -1;
+    }
+
+    // Leer datos del paquete
+    uint32_t worker_id, query_id;
+    buffer_reset_offset(buffer);
+    buffer_read_uint32(buffer, &worker_id);
+    buffer_read_uint32(buffer, &query_id);
+
+    // Buscar worker por socket (coincide con tu approach en manage_read_message...)
+    t_worker_control_block *worker = NULL;
+    for (int i = 0; i < list_size(master->workers_table->worker_list); i++) {
+        t_worker_control_block *aux = list_get(master->workers_table->worker_list, i);
+        if (aux->socket_fd == client_socket) {
+            worker = aux;
+            break;
+        }
+    }
+
+    if (worker == NULL) {
+        log_error(master->logger, "[manage_worker_end_query] No se encontró worker para socket=%d (worker_id=%u).", client_socket, worker_id);
+        // intentar aun así enviar ACK al worker (si queremos), pero devolvemos error
+        return -1;
+    }
+
+    // Buscar la query en la running_list
+    t_query_control_block *qcb = NULL;
+    for (int i = 0; i < list_size(master->queries_table->running_list); i++) {
+        t_query_control_block *aux = list_get(master->queries_table->running_list, i);
+        if (aux->query_id == (int)query_id) {
+            qcb = aux;
+            break;
+        }
+    }
+
+    if (qcb == NULL) {
+        log_error(master->logger, "[manage_worker_end_query] No se encontró Query ID=%u en RUNNING (Worker ID=%u).", query_id, worker->worker_id);
+        // Marcar worker IDLE por seguridad
+        worker->state = WORKER_STATE_IDLE;
+        worker->current_query_id = -1;
+        return -1;
+    }
+
+    // Log obligatorio
+    log_info(master->logger,
+             "## Se terminó la Query %d en el Worker %d",
+             qcb->query_id, worker->worker_id);
+
+    // Notificar al Query Control (si está conectado)
+    if (qcb->socket_fd > 0) {
+        t_package *resp = package_create_empty(OP_MASTER_QUERY_END);
+        if (resp) {
+            package_add_uint32(resp, (uint32_t) qcb->query_id);
+            // Si tu Worker envía un resultado, podés agregarlo aquí antes de enviar.
+            if (package_send(resp, qcb->socket_fd) != 0) {
+                log_error(master->logger, "[manage_worker_end_query] Error al enviar resultado final a QC (Query ID=%d, socket=%d).",
+                          qcb->query_id, qcb->socket_fd);
+            }
+            package_destroy(resp);
+        }
+        // según spec: cerrar socket del QC cuando se entrega resultado final
+        close(qcb->socket_fd);
+    }
+
+    // Quitar qcb de running_list
+    bool removed = list_remove_by_condition(master->queries_table->running_list, (void *) (size_t) qcb);
+    // Si no tenés list_remove_by_condition, buscá el índice y list_remove
+    // (Ajustalo según tu API de commons/collections)
+    // Liberar recursos de la query (ajustar a la función real que tengas)
+    // Aquí asumimos query_destroy(qcb)
+    query_destroy(qcb);
+
+    // Responder ACK al Worker
+    t_package *ack = package_create_empty(OP_WORKER_ACK);
+    if (ack) {
+        package_send(ack, client_socket);
+        package_destroy(ack);
+    }
+
+    // Poner worker IDLE y limpiar current_query_id
+    worker->state = WORKER_STATE_IDLE;
+    worker->current_query_id = -1;
+
+    // Intentar despachar la siguiente query
+    try_dispatch(master);
+
+    return 0;
+} */
