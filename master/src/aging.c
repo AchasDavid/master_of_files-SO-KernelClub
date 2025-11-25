@@ -2,6 +2,7 @@
 #include "worker_manager.h"
 #include "init_master.h"
 #include "aging.h"
+#include "disconnection_handler.h"
 #include <unistd.h>
 
 static int search_worker_id = -1;
@@ -22,7 +23,7 @@ void *aging_thread_func(void *arg) {
         }
 
         // si ready queue está vacia, nada para hacer
-        if (list_is_empty(master->queries_table->ready_queue)) {
+        if (list_is_empty(master->queries_table->ready_queue)) {            
             pthread_mutex_unlock(&master->queries_table->query_table_mutex);
             continue;
         }
@@ -136,17 +137,13 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
     );
 
     if (!worker || worker->socket_fd <= 0) {
-        pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
-
         log_error(master->logger,
             "[preempt_query_in_exec] Worker inválido durante preemption. Finalizando Query ID=%d",
             qcb->query_id
         );
 
-        // Estas dos funciones están en la PR que maneja desconexiones
-        // Quedan comentadas hasta que se apruebe
-        // finalize_query_with_error(qcb, master, "Error en preemption");
-        // cleanup_query_resources(qcb, master);
+        finalize_query_with_error(qcb, master, "Error en preemption");
+        cleanup_query_resources(qcb, master);
         return -1;
     }
 
@@ -161,7 +158,6 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
         qcb->query_id, qcb->priority, worker->worker_id
     );
 
-    pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
     return 0;
 }
 

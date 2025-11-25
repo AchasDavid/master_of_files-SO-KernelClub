@@ -78,6 +78,7 @@ int main(int argc, char* argv[]) {
     
     // Inicio el servidor
     int server_socket_fd = start_server(master->ip, master->port);
+    master->running = true;
 
     // Inicio hilo aging (si estoy en priotidad)
     if(strcmp(master->scheduling_algorithm, "PRIORITY") == 0) {
@@ -128,6 +129,7 @@ int main(int argc, char* argv[]) {
         }
 
         pthread_detach(client_thread);
+        pthread_detach(master->aging_thread);
     }
 
 clean:
@@ -174,6 +176,7 @@ void* handle_client(void* arg) {
             case OP_QUERY_HANDSHAKE:
                 log_debug(master->logger, "Recibido OP_QUERY_HANDSHAKE de socket %d", client_socket);
                 if (manage_query_handshake(client_socket, master->logger) == 0) {
+                    is_query_control = true;
                     log_info(master->logger, "Handshake completado con Query Control en socket %d", client_socket);
                 }       
                 break;
@@ -192,6 +195,7 @@ void* handle_client(void* arg) {
             case OP_WORKER_HANDSHAKE_REQ:
                 log_debug(master->logger, "Recibido OP_WORKER_HANDSHAKE de socket %d", client_socket);
                 if (manage_worker_handshake(required_package->buffer, client_socket, master) == 0) {
+                    is_worker = true;
                     log_info(master->logger, "Handshake completado con worker en socket %d", client_socket);
                 }              
                 break;
