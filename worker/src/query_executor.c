@@ -49,6 +49,11 @@ void *query_executor_thread(void *arg)
         }
         else
         {
+            if (result == QUERY_RESULT_ERROR)
+            {
+                mm_flush_all_dirty(state->memory_manager);
+            }
+
             state->has_query = false;
             state->is_executing = false;
             log_info(state->logger, "## Query %d: %s", ctx.query_id, (result == QUERY_RESULT_END ? "Finalizada" : "Abortada"));
@@ -101,7 +106,11 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
     }
 
     char *raw_instruction = NULL;
-    if (fetch_instruction(ctx->query_path, ctx->program_counter, &raw_instruction) < 0)
+    char path = NULL;
+    path = (char)malloc(256);
+    strcpy(path, state->config->path_scripts);
+    strcat(path, ctx->query_path);
+    if (fetch_instruction(path, ctx->program_counter, &raw_instruction) < 0)
     {
         log_error(state->logger, "## Query %d: Error en FETCH - PC: %d", ctx->query_id, ctx->program_counter);
         return QUERY_RESULT_ERROR;
