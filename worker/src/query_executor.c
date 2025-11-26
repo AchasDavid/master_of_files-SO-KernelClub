@@ -49,6 +49,11 @@ void *query_executor_thread(void *arg)
         }
         else
         {
+            if (result == QUERY_RESULT_ERROR)
+            {
+                mm_flush_all_dirty(state->memory_manager);
+            }
+
             state->has_query = false;
             state->is_executing = false;
             log_info(state->logger, "## Query %d: %s", ctx.query_id, (result == QUERY_RESULT_END ? "Finalizada" : "Abortada"));
