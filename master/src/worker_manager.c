@@ -58,7 +58,6 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
 
     uint32_t worker_id;
     uint32_t query_id;
-    char *file_tag;
     void *data = NULL;
     size_t size;
 
@@ -66,9 +65,19 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
     buffer_read_uint32(buffer, &worker_id);
     buffer_read_uint32(buffer, &query_id);
     data = buffer_read_data(buffer, &size);
-    file_tag = buffer_read_string(buffer);
-    strcat(file_tag, ":");
-    strcat(file_tag, buffer_read_string(buffer));
+    char *file = buffer_read_string(buffer);
+    char *tag = buffer_read_string(buffer);
+
+    // Calculo tamaño necesario y asignar memoria adecuada (QC espera un unico string "FILE:TAG")
+    size_t file_tag_len = strlen(file) + 1 + strlen(tag) + 1;
+    char *file_tag = malloc(file_tag_len);
+
+    // Construir "FILE:TAG"
+    snprintf(file_tag, file_tag_len, "%s:%s", file, tag);
+    
+    // Libero los strings temporales
+    free(file);
+    free(tag);
 
     log_debug(master->logger, "Recibido lectura desde worker id: %d para renviar a query id: %d. File:Tag <%s> Data= %s", worker_id, query_id, file_tag, data);
 

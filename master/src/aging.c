@@ -4,6 +4,7 @@
 #include "aging.h"
 #include "disconnection_handler.h"
 #include <unistd.h>
+#include <commons/log.h>
 
 static int search_worker_id = -1;
 
@@ -13,7 +14,12 @@ void *aging_thread_func(void *arg) {
     while (master->running) {
         // Definir cada cuanto se hace la verificación, un tiempo fijo (100ms, 250ms)
         // o una fracción del aging interval (10 veces cada intervalo)
-        usleep(master->aging_interval * 100); // -> Por ahora, 10 verificaciones por intervalo
+        if (master->aging_interval <= 0) {
+            usleep(100000); // 100ms
+            continue;
+        }else{
+            usleep(master->aging_interval * 100); // -> Por ahora, 10 verificaciones por intervalo
+        }
 
         uint64_t now = now_ms_monotonic();
 
@@ -68,10 +74,8 @@ void *aging_thread_func(void *arg) {
 
                 // Actualizamos en timestamp en Ready
                 qcb->ready_timestamp += (uint64_t)intervals * (uint64_t)master->aging_interval;
-
-                log_info(master->logger,
-                         "##<QUERY_ID: %d> Cambio de prioridad: <PRIORIDAD_ANTERIOR: %d> - <PRIORIDAD_NUEVA: %d>",
-                         qcb->query_id, original_priority, qcb->priority);
+                
+                log_info(master->logger, "##<QUERY_ID: %d> Cambio de prioridad: <PRIORIDAD_ANTERIOR: %d> - <PRIORIDAD_NUEVA: %d>", qcb->query_id, original_priority, qcb->priority);
             }
         }
 
