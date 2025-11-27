@@ -42,7 +42,7 @@ int manage_query_file_path(t_package *response_package, int client_socket, t_mas
 
     int assigned_id = generate_query_id(master);
     // Responder a QC
-    t_package *query_path_package = package_create_empty(OP_QUERY_FILE_PATH);
+    t_package *query_path_package = package_create_empty(QC_OP_MASTER_CONNECTION_OK);
 
     if (!query_path_package)
     {
