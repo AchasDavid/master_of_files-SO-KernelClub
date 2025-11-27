@@ -93,7 +93,7 @@ int deserialize_block_write_request(t_package *package, uint32_t *query_id,
               *query_id);
     retval = -1;
     goto clean_tag;
-  } 
+  }
 
   return retval;
 
