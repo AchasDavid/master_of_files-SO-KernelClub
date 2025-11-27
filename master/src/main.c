@@ -146,15 +146,15 @@ void* handle_client(void* arg) {
     t_client_data *client_data = (t_client_data*)arg;
     int client_socket = client_data->client_socket;
     t_master *master = client_data->master;
-    // Variables para identificar tipo de cliente y manejar desconexiones
-    bool is_query_control = false;
-    bool is_worker = false;
+
+    // flags para identificar tipo de cliente y manejar desconexiones
+    bool is_query_control = false, is_worker = false;
 
     while (1) {
         t_package *required_package = package_receive(client_socket);
 
         if (required_package == NULL) {
-            log_error(master->logger, "Error al recibir el paquete del cliente %d, se cierra conexión y libera socket.", client_socket);
+            log_debug(master->logger, "Error al recibir el paquete del cliente %d, se cierra conexión y libera socket.", client_socket);
             
             // Manejar desconexión según tipo de cliente identificado
             if (is_query_control) {
@@ -208,7 +208,7 @@ void* handle_client(void* arg) {
                 log_debug(master->logger, "Recibido OP_WORKER_END_QUERY en socket %d", client_socket);
                 if (manage_worker_end_query(required_package->buffer, client_socket, master) != 0) {
                     log_error(master->logger, "Error al manejar OP_WORKER_END_QUERY desde socket %d", client_socket);
-                }
+                }                
                 break;
             case WORKER_OP_DISCONNECTION:
                 log_info(master->logger, "Recibido WORKER_OP_DISCONNECTION de socket %d", client_socket);

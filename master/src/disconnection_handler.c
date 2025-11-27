@@ -91,9 +91,10 @@ int handle_query_control_disconnection(int client_socket, t_master *master) {
         case QUERY_STATE_NEW:
         case QUERY_STATE_COMPLETED:
         case QUERY_STATE_CANCELED:
-        default:
             log_debug(master->logger, "[handle_query_control_disconnection] Query ID=%d en estado %d, se mueve a CANCELED/EXIT",
                       qcb->query_id, qcb->state);
+            break;
+        default:
             finalize_query_with_error(qcb, master, "Query cancelada porque Query Control se desconectó");
             break;
     }
