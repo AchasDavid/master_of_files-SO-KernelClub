@@ -107,16 +107,13 @@ int main(int argc, char* argv[])
     // Preparo para recibir respuesta
     t_package *response_package = package_receive(master_socket);
 
-    if (!response_package) {
-        retval = fail_pkg(logger, "Error al recibir respuesta de handshake", &response_package, -6);
-        goto clean_socket;
-    }
-    if (response_package->operation_code != OP_QUERY_HANDSHAKE) {
+    if (!response_package || response_package->operation_code != OP_QUERY_HANDSHAKE) {
         retval = fail_pkg(logger, "Handshake inválido (opcode inesperado)", &response_package, -6);
         goto clean_socket;
     }
 
     package_destroy(response_package);
+    response_package = NULL; 
     
     log_info(logger, "## Conexión al Master exitosa. IP: %s, Puerto: %s.", query_control_config->ip, query_control_config->port);
 
@@ -177,6 +174,7 @@ int main(int argc, char* argv[])
             char* file_tag = buffer_read_string(resp->buffer);
 
             if(file_tag == NULL){
+                free(file_data);
                 retval = fail_pkg(logger, "El fileTag recibido es nulo", &resp, -7);
                 goto clean_socket;
 
@@ -188,7 +186,7 @@ int main(int argc, char* argv[])
                  goto clean_socket;             
             } 
 
-            log_info(logger, "## Lectura realizada:  <%s>, contenido: %s", file_tag, file_data);
+            log_info(logger, "## Lectura realizada:  <%s>, contenido: %s", file_tag, (char*)file_data);
 
             free(file_tag);
             free(file_data);
@@ -217,7 +215,6 @@ int main(int argc, char* argv[])
     package_destroy(resp);
 }
 
-    package_destroy(response_package);
 
 clean_socket:
     close(master_socket);
