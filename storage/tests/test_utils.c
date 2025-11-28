@@ -192,27 +192,36 @@ int init_logical_blocks(const char *name, const char *tag, int numb_blocks, cons
 }
 
 int create_test_metadata(const char *name, const char *tag, int numb_blocks, char *blocks_array_str, char *status, char *mount_point) {
+    int retval = 0;
     int size = numb_blocks * TEST_BLOCK_SIZE;
 
     int total_blocks = TEST_FS_SIZE / TEST_BLOCK_SIZE;
-    if (total_blocks < numb_blocks)
-        return -1;
-    
+    if (total_blocks < numb_blocks) {
+        retval = -1;
+        goto end;
+    }
+
     char **blocks_array = string_get_string_as_array(blocks_array_str);
-    if(string_array_size(blocks_array) != numb_blocks)
-        return -2;
+    if(string_array_size(blocks_array) != numb_blocks) {
+        retval = -2;
+        goto cleanup_array;
+    }
 
     char metadata_path[PATH_MAX];
     snprintf(metadata_path, sizeof(metadata_path), "%s/files/%s/%s/metadata.config", mount_point, name, tag);
     FILE* metadata_file = fopen(metadata_path, "w");
     if (metadata_file == NULL) {
-        return -3;
+        retval = -3;
+        goto cleanup_array;
     }
 
     fprintf(metadata_file, "SIZE=%d\nBLOCKS=%s\nESTADO=%s\n", size, blocks_array_str, status);
     fclose(metadata_file);
 
-    return 0;
+cleanup_array:
+    string_array_destroy(blocks_array);
+end:
+    return retval;
 }
 
 bool correct_unlock(const char *name, const char *tag) {
