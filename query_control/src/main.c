@@ -107,16 +107,13 @@ int main(int argc, char* argv[])
     // Preparo para recibir respuesta
     t_package *response_package = package_receive(master_socket);
 
-    if (!response_package) {
-        retval = fail_pkg(logger, "Error al recibir respuesta de handshake", &response_package, -6);
-        goto clean_socket;
-    }
-    if (response_package->operation_code != OP_QUERY_HANDSHAKE) {
+    if (!response_package || response_package->operation_code != OP_QUERY_HANDSHAKE) {
         retval = fail_pkg(logger, "Handshake inválido (opcode inesperado)", &response_package, -6);
         goto clean_socket;
     }
 
     package_destroy(response_package);
+    response_package = NULL; 
     
     log_info(logger, "## Conexión al Master exitosa. IP: %s, Puerto: %s.", query_control_config->ip, query_control_config->port);
 
@@ -171,13 +168,13 @@ int main(int argc, char* argv[])
 
     switch (resp->operation_code) {
 
-        case QC_OP_READ_DATA: {
-
-            char* file_tag = package_read_string(resp);  
+        case QC_OP_READ_DATA: {    
             size_t size = 0; 
-            void* file_data = package_read_data(resp, &size);
+            void* file_data = buffer_read_data(resp->buffer, &size);
+            char* file_tag = buffer_read_string(resp->buffer);
 
             if(file_tag == NULL){
+                free(file_data);
                 retval = fail_pkg(logger, "El fileTag recibido es nulo", &resp, -7);
                 goto clean_socket;
 
@@ -189,31 +186,18 @@ int main(int argc, char* argv[])
                  goto clean_socket;             
             } 
 
-
-            char* contenido = malloc(size + 1);
-
-            if (!contenido) {
-                retval = fail_pkg(logger, "Memoria insuficiente al procesar READ_DATA", &resp, -7);
-                free(file_tag); free(file_data);
-                goto clean_socket;
-            }
-            memcpy(contenido, file_data, size);
-            contenido[size] = '\0';
-
-            // Estructura <File:Tag> debe venir de master en un solo string listo para logear
-            log_info(logger, "## Lectura realizada: File %s, contenido: %s", file_tag, contenido);
+            log_info(logger, "## Lectura realizada:  <%s>, contenido: %s", file_tag, (char*)file_data);
 
             free(file_tag);
             free(file_data);
-            free(contenido);
         } break;
 
         case QC_OP_MASTER_FIN_DESCONEXION:
-        case QC_OP_MASTER_FIN_PRIORIDAD: {
+        case OP_MASTER_QUERY_END: {
 
 
             const char* motivoString =
-            (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "PRIORIDAD";
+            (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "finalización de Query";
 
             log_info(logger, "## Query Finalizada - %s", motivoString);
 
@@ -231,7 +215,6 @@ int main(int argc, char* argv[])
     package_destroy(resp);
 }
 
-    package_destroy(response_package);
 
 clean_socket:
     close(master_socket);
@@ -241,8 +224,4 @@ clean_config:
     destroy_query_control_config_instance(query_control_config);
 error:
     return retval;
-
-
-
 }
-
