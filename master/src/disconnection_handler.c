@@ -1,4 +1,5 @@
 #include "disconnection_handler.h"
+#include "aging.h"
 
 #include <commons/collections/list.h>
 #include <stdlib.h>
@@ -22,11 +23,11 @@ static bool match_query_by_id(void *elem) {
 // --- Worker por ID ---
 static int search_worker_id = -1;
 
-static bool match_worker_by_id(void *element) {
+/* static bool match_worker_by_id(void *element) {
     t_worker_control_block *worker = (t_worker_control_block *) element;
     if (worker == NULL) return false;
     return (worker->worker_id == search_worker_id);
-}
+} */
 
 // --- Query por socket_fd ---
 static int search_query_socket_fd = -1;
@@ -203,6 +204,51 @@ void cancel_query_in_ready(t_query_control_block *qcb, t_master *master) {
 }
 
 int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
+        if (!qcb || !master) return -1;
+
+    if (qcb->preemption_pending) {
+        // Ya hay un desalojo en curso para esta query
+        // No hacer nada
+        return 0;
+    }
+
+    search_worker_id = qcb->assigned_worker_id;
+    t_worker_control_block *worker = list_find(
+        master->workers_table->worker_list,
+        match_worker_by_id
+    );
+
+    if (!worker || worker->socket_fd <= 0) {
+        log_error(master->logger,
+            "[preempt_query_in_exec] Worker inválido durante preemption. Finalizando Query ID=%d",
+            qcb->query_id
+        );
+
+        finalize_query_with_error(qcb, master, "Error en preemption");
+        cleanup_query_resources(qcb, master);
+        return -1;
+    }
+
+    // Marcar que hay un desalojo pendiente
+    qcb->preemption_pending = true;
+
+    // Envío solicitud de desalojo, la respuesta la manejo en el worker_manager
+    t_package *pkg = package_create_empty(OP_WORKER_PREEMPT_REQ);
+    package_add_uint32(pkg, (uint32_t)qcb->query_id);
+    package_send(pkg, worker->socket_fd);
+    package_destroy(pkg);
+
+
+
+    log_info(master->logger,
+        "## Se desaloja la Query id: %d (<PRIORIDAD: %d>) del Worker <WORKER_ID: %d> - Motivo: DESCONEXIÓN QC",
+        qcb->query_id, qcb->priority, worker->worker_id
+    );
+
+    return 0;
+
+
+    /*
     if (!qcb || !master) return -1;
 
     log_debug(master->logger, "[cancel_query_in_exec] Cancelando Query ID=%d en estado EXEC (QC socket=%d, asignada a worker id=%d)",
@@ -239,8 +285,10 @@ int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
         return -1;
     }
 
-    // Enviar petición de eviction al worker
-    t_package *pkg = package_create_empty(OP_WORKER_EVICT_REQ);
+    preempt_query_in_exec(qcb, master);
+
+     // Enviar petición de eviction al worker
+    t_package *pkg = package_create_empty(OP_WORKER_PREEMPT_REQ);
     if (!pkg) {
         log_error(master->logger, "[cancel_query_in_exec] No se pudo crear paquete de desalojo");
         pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
@@ -264,7 +312,7 @@ int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
         pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
         finalize_query_with_error(qcb, master, "Falló el envío de solicitud de desalojo al worker");
         return -1;
-    }
+    } 
 
     log_info(master->logger, "[cancel_query_in_exec] Solicitud de desalojo enviada al Worker ID=%d para Query ID=%d",
              target_worker->worker_id, qcb->query_id);
@@ -272,12 +320,13 @@ int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
     // Marcar la query como CANCELED
     qcb->state = QUERY_STATE_CANCELED;
 
-    package_destroy(pkg);
+    //package_destroy(pkg);
 
     pthread_mutex_unlock(&master->workers_table->worker_table_mutex);
 
     // La respuesta del worker deberá ser manejada por handle_eviction_response cuando llegue
     return 0;
+    */
 }
 
 

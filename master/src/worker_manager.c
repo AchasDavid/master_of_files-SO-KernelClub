@@ -95,6 +95,7 @@ int manage_read_message_from_worker(t_buffer *buffer, int client_socket, t_maste
     if (query == NULL) {
         log_error(master->logger, "[manage_read_message_from_worker] No se encontró query ID=%d asociada al worker ID=%d.",
                   query_id, worker_id);
+        try_dispatch(master); // Intentar despachar otras queries pendientes
         return -1;
     }
 
