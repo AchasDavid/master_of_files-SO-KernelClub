@@ -262,7 +262,7 @@ t_file_metadata *read_file_metadata(const char *mount_point,
   metadata->config = config;
   string_array_destroy(blocks_str);
 
-  log_info(g_storage_logger,
+  log_debug(g_storage_logger,
            "Metadata leído: %s:%s - SIZE=%d, BLOCKS=%d, ESTADO=%s", filename,
            tag, metadata->size, metadata->block_count, metadata->state);
 
@@ -301,7 +301,7 @@ int save_file_metadata(t_file_metadata *metadata) {
   config_set_value(metadata->config, "ESTADO", metadata->state);
 
   config_save(metadata->config);
-  log_info(g_storage_logger, "Metadata guardada");
+  log_debug(g_storage_logger, "Metadata guardada");
   return 0;
 }
 
@@ -525,7 +525,7 @@ int bitmap_persist(t_bitarray *bitmap, char *bitmap_buffer) {
     goto clean_file;
   }
 
-  log_info(g_storage_logger, "Bitmap persistido correctamente");
+  log_debug(g_storage_logger, "Bitmap persistido correctamente");
 
 clean_file:
   if (bitmap_file)
