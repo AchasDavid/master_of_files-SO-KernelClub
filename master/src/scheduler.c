@@ -77,6 +77,7 @@ int try_dispatch(t_master *master) {
     worker->state = WORKER_STATE_BUSY;
     query->state = QUERY_STATE_RUNNING;
     query->assigned_worker_id = worker->worker_id;
+    query->preemption_pending = false; 
 
     // Mover a las listas activas
     list_add(master->queries_table->running_list, query);

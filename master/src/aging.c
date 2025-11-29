@@ -160,7 +160,6 @@ int preempt_query_in_exec(t_query_control_block *qcb, t_master *master) {
         return -1;
     }
 
-    // Marcar ANTES de enviar
     qcb->preemption_pending = true;
 
     // Envío solicitud de desalojo
