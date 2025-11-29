@@ -39,13 +39,33 @@ void *query_executor_thread(void *arg)
             }
             pthread_mutex_unlock(&state->mux);
         }
-
-        pthread_mutex_lock(&state->mux);
-
+        
         if (result == QUERY_RESULT_EJECT)
         {
-            state->has_query = false;
-            state->is_executing = false;
+            uint32_t query_id;
+            uint32_t pc;
+
+            pthread_mutex_lock(&state->mux);
+            query_id = state->current_query.query_id;
+            pc       = ctx.program_counter; 
+
+            state->has_query          = false;
+            state->is_executing       = false;
+            state->ejection_requested = false;
+            pthread_mutex_unlock(&state->mux);
+
+            //Recien luego de liberar worker aviso a Master que estoy
+            mm_flush_all_dirty(state->memory_manager);
+
+            t_package *res = package_create_empty(OP_WORKER_EVICT_RES);
+            package_add_uint32(res, query_id);
+            package_add_uint32(res, pc);
+            package_send(res, state->master_socket);
+            package_destroy(res);
+
+            log_info(state->logger,
+                     "## Query %d: Desalojada por pedido del Master - PC=%d",
+                     query_id, pc);
         }
         else
         {
@@ -54,8 +74,10 @@ void *query_executor_thread(void *arg)
                 mm_flush_all_dirty(state->memory_manager);
             }
 
+            pthread_mutex_lock(&state->mux);
             state->has_query = false;
             state->is_executing = false;
+            pthread_mutex_unlock(&state->mux);
             log_info(state->logger, "## Query %d: %s", ctx.query_id, (result == QUERY_RESULT_END ? "Finalizada" : "Abortada"));
         }
 
@@ -93,14 +115,6 @@ static query_result_t execute_single_instruction(worker_state_t *state, query_co
     pthread_mutex_unlock(&state->mux);
     if (eject_before_fetch)
     {
-        mm_flush_all_dirty(state->memory_manager);
-
-        t_package *res = package_create_empty(OP_WORKER_EVICT_RES);
-        package_add_uint32(res, ctx->query_id);
-        package_add_uint32(res, ctx->program_counter);
-        package_send(res, state->master_socket);
-        package_destroy(res);
-
         log_info(state->logger, "## Query %d: Desalojada por pedido del Master", ctx->query_id);
         return QUERY_RESULT_EJECT;
     }
