@@ -1,5 +1,59 @@
 #include "storage.h"
+#include "worker.h"
 #include <string.h>
+
+// Versión mejorada de send_request_and_wait_ack que maneja errores de Storage
+static int send_request_and_wait_ack_with_error_handling(int storage_socket,
+                                                         int master_socket,
+                                                         t_package *request,
+                                                         t_storage_op_code expected_response_code,
+                                                         const char *operation_name, 
+                                                         int worker_id)
+{
+    t_log *logger = logger_get();
+
+    if (!request)
+    {
+        log_error(logger, "[send_request_and_wait_ack_with_error_handling] Error al crear el paquete para %s", operation_name);
+        return -1;
+    }
+
+    if (package_send(request, storage_socket) != 0)
+    {
+        log_error(logger, "[send_request_and_wait_ack_with_error_handling] Error al enviar la solicitud de %s al Storage", operation_name);
+        package_destroy(request);
+        return -1;
+    }
+
+    package_destroy(request);
+
+    t_package *response = package_receive(storage_socket);
+    if (!response)
+    {
+        log_error(logger, "[send_request_and_wait_ack_with_error_handling] Error al recibir la respuesta de %s del Storage", operation_name);
+        return -1;
+    }
+
+    // Verificar si Storage reportó un error
+    if (response->operation_code == STORAGE_OP_ERROR)
+    {
+        log_error(logger, "[send_request_and_wait_ack_with_error_handling] Storage reportó un error para la operación: %s", operation_name);
+        handler_error_from_storage(response, master_socket);
+        package_destroy(response);
+        return -1;
+    }
+
+    if (response->operation_code != expected_response_code)
+    {
+        log_error(logger, "[send_request_and_wait_ack_with_error_handling] Tipo de paquete inesperado para la respuesta de %s (esperado=%u, recibido=%u)",
+                  operation_name, (unsigned)expected_response_code, (unsigned)response->operation_code);
+        package_destroy(response);
+        return -1;
+    }
+
+    package_destroy(response);
+    return 0;
+}
 
 static int send_request_and_wait_ack(int storage_socket,
                                      t_package *request,
@@ -27,6 +81,16 @@ static int send_request_and_wait_ack(int storage_socket,
     if (!response)
     {
         log_error(logger, "Error al recibir la respuesta de %s del Storage", operation_name);
+        return -1;
+    }
+
+    // Verificar si Storage reportó un error
+    if (response->operation_code == STORAGE_OP_ERROR)
+    {
+        log_error(logger, "Storage reportó un error para la operación: %s", operation_name);
+        // El handler_error_from_storage se llamará desde donde se use esta función
+        // si es necesario (en funciones que tengan acceso a master_socket)
+        package_destroy(response);
         return -1;
     }
 
@@ -138,6 +202,14 @@ int read_block_from_storage(int storage_socket, char *file, char *tag, uint32_t 
     if (!response)
     {
         log_error(logger, "Error al recibir la respuesta de lectura de bloque del Storage");
+        return -1;
+    }
+
+    // Verificar si Storage reportó un error
+    if (response->operation_code == STORAGE_OP_ERROR)
+    {
+        log_error(logger, "Storage reportó error en lectura de bloque del archivo %s:%s", file, tag);
+        package_destroy(response);
         return -1;
     }
 
@@ -263,7 +335,7 @@ int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char
     return -1;
 }
 
-int commit_file_in_storage(int storage_socket, char *file, char *tag, int worker_id)
+int commit_file_in_storage(int storage_socket, int master_socket,char *file, char *tag, int worker_id)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_TAG_COMMIT_REQ);
@@ -273,19 +345,43 @@ int commit_file_in_storage(int storage_socket, char *file, char *tag, int worker
         package_add_string(request, file) &&
         package_add_string(request, tag))
     {
+        if (package_send(request, storage_socket) != 0) {
+            log_error(logger, "[commit_file_in_storage] Error al enviar commit a Storage para archivo %s:%s", file, tag);
+            package_destroy(request);
+            return -1;
+        }
+        package_destroy(request);
 
-        int result = send_request_and_wait_ack(storage_socket, request,
-                                               STORAGE_OP_TAG_COMMIT_RES,
-                                               "commit de archivo", worker_id);
-        if (result == 0)
+        t_package *result = package_receive(storage_socket);
+        if (!result)
+        {
+            log_error(logger, "[commit_file_in_storage] Error al recibir la respuesta de commit del Storage");
+            return -1;
+        }
+
+        // Verificar si Storage reportó un error
+        if (result->operation_code == STORAGE_OP_ERROR)
+        {
+            log_error(logger, "[commit_file_in_storage] Storage reportó error en commit de archivo %s:%s", file, tag);
+            handler_error_from_storage(result, master_socket);
+            package_destroy(result);
+            return -1;
+        }
+                
+        if (result->operation_code == STORAGE_OP_TAG_COMMIT_RES)
         {
             // Idem log info de fork.
-            log_debug(logger, "Commit del archivo %s:%s realizado con éxito", file, tag);
+            log_debug(logger, "[commit_file_in_storage] Commit del archivo %s:%s realizado con éxito", file, tag);
+            package_destroy(result);
+            return 0;
         }
-        return result;
+
+        log_error(logger, "[commit_file_in_storage] Tipo de respuesta inesperado en commit");
+        package_destroy(result);
+        return -1;
     }
 
-    log_error(logger, "Error al preparar el paquete para commit");
+    log_error(logger, "[commit_file_in_storage] Error al preparar el paquete para commit");
     if (request)
         package_destroy(request);
     return -1;
@@ -296,32 +392,65 @@ int write_block_to_storage(int storage_socket, char *file, char *tag, uint32_t b
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_BLOCK_WRITE_REQ);
 
-    if (request &&
-        package_add_uint32(request, worker_id) &&
-        package_add_string(request, file) &&
-        package_add_string(request, tag) &&
-        package_add_uint32(request, block_number) &&
-        package_add_data(request, data, size))
+    if (!request)
     {
-
-        int result = send_request_and_wait_ack(storage_socket, request,
-                                               STORAGE_OP_BLOCK_WRITE_RES,
-                                               "escritura de bloque", worker_id);
-        if (result == 0)
-        {
-            log_debug(logger, "Escritura del bloque %u del archivo %s:%s realizada con éxito", block_number, file, tag);
-        }
-        return result;
+        log_error(logger, "Error al crear el paquete para escritura de bloque");
+        return -1;
     }
 
-    log_error(logger, "Error al preparar el paquete para escritura de bloque");
-    if (request)
+    if (!package_add_uint32(request, worker_id) ||
+        !package_add_string(request, file) ||
+        !package_add_string(request, tag) ||
+        !package_add_uint32(request, block_number) ||
+        !package_add_data(request, data, size))
+    {
+        log_error(logger, "Error al agregar datos al paquete para escritura de bloque");
         package_destroy(request);
-    return -1;
+        return -1;
+    }
+
+    if (package_send(request, storage_socket) != 0)
+    {
+        log_error(logger, "Error al enviar la solicitud de escritura de bloque al Storage");
+        package_destroy(request);
+        return -1;
+    }
+    package_destroy(request);
+
+    t_package *response = package_receive(storage_socket);
+    if (!response)
+    {
+        log_error(logger, "Error al recibir la respuesta de escritura de bloque del Storage");
+        return -1;
+    }
+
+    // Verificar si Storage reportó un error
+    if (response->operation_code == STORAGE_OP_ERROR)
+    {
+        log_error(logger, "Storage reportó error en escritura de bloque del archivo %s:%s", file, tag);
+        package_destroy(response);
+        return -1;
+    }
+
+    if (response->operation_code != STORAGE_OP_BLOCK_WRITE_RES)
+    {
+        log_error(logger, "Tipo de paquete inesperado para la respuesta de escritura de bloque (esperado=%u, recibido=%u)",
+                  (unsigned)STORAGE_OP_BLOCK_WRITE_RES, (unsigned)response->operation_code);
+        package_destroy(response);
+        return -1;
+    }
+
+    package_destroy(response);
+
+    log_debug(logger, "Escritura del bloque %u del archivo %s:%s realizada con éxito", block_number, file, tag);
+
+    return 0;
 }
 
 int delete_file_in_storage(int storage_socket, char *file, char *tag, int worker_id)
 {
+    // Nota: Esta función no tiene acceso a master_socket, por lo que no puede notificar errores
+    // Los errores serán capturados en query_interpreter.c y manejados allí
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_TAG_DELETE_REQ);
 
@@ -345,4 +474,56 @@ int delete_file_in_storage(int storage_socket, char *file, char *tag, int worker
     if (request)
         package_destroy(request);
     return -1;
+}
+
+void handler_error_from_storage(t_package *result, int master_socket){
+    t_log *logger = logger_get();
+
+    if (!result || !logger) {
+        if (logger) {
+            log_error(logger, "[handler_error_from_storage] Paquete de error inválido");
+        }
+        return;
+    }
+
+    uint32_t query_id;
+    if (!package_read_uint32(result, &query_id))
+    {
+        log_error(logger, "[handler_error_from_storage] Error al leer el query_id del paquete de error del Storage");
+        return;
+    }
+
+    char *error_message = package_read_string(result);
+    if (!error_message)
+    {
+        log_error(logger, "[handler_error_from_storage] Error al leer el mensaje de error del paquete de error del Storage");
+        return;
+    }
+
+    log_error(logger, "## Storage Error - Query ID: %d - %s", query_id, error_message);
+
+    // Enviar notificación de error al Master
+    t_package *error_package = package_create_empty(STORAGE_OP_ERROR);
+    if (!error_package) {
+        log_error(logger, "[handler_error_from_storage] Error al crear paquete de error para Master");
+        free(error_message);
+        return;
+    }
+
+    if (!package_add_uint32(error_package, query_id) || !package_add_string(error_package, error_message)) {
+        log_error(logger, "[handler_error_from_storage] Error al agregar datos al paquete de error para Master");
+        package_destroy(error_package);
+        free(error_message);
+        return;
+    }
+
+    if (package_send(error_package, master_socket) != 0) {
+        log_error(logger, "[handler_error_from_storage] Error al enviar paquete de error al Master para Query ID=%d", query_id);
+    } else {
+        log_info(logger, "[handler_error_from_storage] Notificación de error enviada a Master para Query ID=%d", query_id);
+    }
+
+    package_destroy(error_package);
+    free(error_message);
+    return;
 }
