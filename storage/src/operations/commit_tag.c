@@ -2,6 +2,7 @@
 
 t_package *handle_tag_commit_request(t_package *package) {
   uint32_t query_id;
+  t_package *response = NULL;
   char *name = NULL;
   char *tag = NULL;
 
@@ -11,25 +12,38 @@ t_package *handle_tag_commit_request(t_package *package) {
 
   int operation_result = execute_tag_commit(query_id, name, tag);
 
+  if(operation_result == FILE_ALREADY_COMMITTED) {
+    // handleo el error de que ya está commiteado
+    char *error_message = string_from_format(
+        "El archivo %s:%s ya está en estado 'COMMITTED'.", name, tag);
+
+    response = package_create_empty(STORAGE_OP_ERROR);
+    package_add_uint32(response, query_id);
+    package_add_string(response, error_message);
+  }
+  
+  if(operation_result == 0) {
+    response = package_create_empty(STORAGE_OP_TAG_COMMIT_RES);
+ 
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32 " - Fallo al crear paquete de respuesta.",
+                query_id);
+      return NULL;
+    }
+
+    if (!package_add_int8(response, (int8_t)operation_result)) {
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32
+                " - Error al escribir status en respuesta de COMMIT TAG",
+                query_id);
+      package_destroy(response);
+      return NULL;
+    }
+  }
+
   free(name);
   free(tag);
-
-  t_package *response = package_create_empty(STORAGE_OP_TAG_COMMIT_RES);
-  if (!response) {
-    log_error(g_storage_logger,
-              "## Query ID: %" PRIu32 " - Fallo al crear paquete de respuesta.",
-              query_id);
-    return NULL;
-  }
-
-  if (!package_add_int8(response, (int8_t)operation_result)) {
-    log_error(g_storage_logger,
-              "## Query ID: %" PRIu32
-              " - Error al escribir status en respuesta de COMMIT TAG",
-              query_id);
-    package_destroy(response);
-    return NULL;
-  }
 
   package_reset_read_offset(response);
 
@@ -112,6 +126,7 @@ int execute_tag_commit(uint32_t query_id, const char *name, const char *tag) {
              "## Query ID: %" PRIu32 " - El archivo %s:%s ya está en estado "
              "'COMMITTED'.",
              query_id, name, tag);
+             retval = FILE_ALREADY_COMMITTED;
     goto cleanup_metadata;
   }
 

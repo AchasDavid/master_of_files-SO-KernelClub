@@ -1,4 +1,5 @@
 #include "storage.h"
+#include "worker.h"
 #include <string.h>
 
 static int send_request_and_wait_ack(int storage_socket,
@@ -263,7 +264,7 @@ int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char
     return -1;
 }
 
-int commit_file_in_storage(int storage_socket, char *file, char *tag, int worker_id)
+int commit_file_in_storage(int storage_socket, int master_socket,char *file, char *tag, int worker_id)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_TAG_COMMIT_REQ);
@@ -273,16 +274,32 @@ int commit_file_in_storage(int storage_socket, char *file, char *tag, int worker
         package_add_string(request, file) &&
         package_add_string(request, tag))
     {
-
-        int result = send_request_and_wait_ack(storage_socket, request,
+/* 
+        t_package *result = send_request_and_wait_ack(storage_socket, request,
                                                STORAGE_OP_TAG_COMMIT_RES,
-                                               "commit de archivo", worker_id);
-        if (result == 0)
+                                               "commit de archivo", worker_id); */
+        package_send(request, storage_socket);
+        package_destroy(request);
+
+        t_package *result = package_receive(storage_socket);
+        if (!result)
+        {
+            log_error(logger, "Error al recibir la respuesta de commit del Storage");
+            package_destroy(request);
+            return -1;
+        }
+        if (result->operation_code == STORAGE_OP_ERROR)
+        {
+            handler_error_from_storage(result, master_socket);
+            return 0; // No corto la operación del worker, solo informo el error al master
+        }
+                
+        if (result->operation_code == STORAGE_OP_TAG_COMMIT_RES)
         {
             // Idem log info de fork.
             log_debug(logger, "Commit del archivo %s:%s realizado con éxito", file, tag);
         }
-        return result;
+        return 0;
     }
 
     log_error(logger, "Error al preparar el paquete para commit");
@@ -346,3 +363,34 @@ int delete_file_in_storage(int storage_socket, char *file, char *tag, int worker
         package_destroy(request);
     return -1;
 }
+
+void handler_error_from_storage(t_package *result, int master_socket){
+    t_log *logger = logger_get();
+
+    uint32_t query_id;
+    if (!package_read_uint32(result, &query_id))
+    {
+        log_error(logger, "Error al leer el query_id del paquete de error del Storage");
+        return;
+    }
+
+    char *error_message = package_read_string(result);
+    if (!error_message)
+    {
+        log_error(logger, "Error al leer el mensaje de error del paquete de error del Storage");
+        return;
+    }
+
+    log_error(logger, "## Query ID: %d - %s", query_id, error_message);
+
+    // Aviso a master, luego en worker_listener.c se maneja el desalojo y limpieza de recursos            
+    t_package *error_package = package_create_empty(STORAGE_OP_ERROR);
+    package_add_uint32(error_package, query_id);
+    package_add_string(error_package, error_message);
+    package_send(error_package, master_socket);
+
+    free(error_message);
+    package_destroy(error_package);
+    return;
+     
+    }

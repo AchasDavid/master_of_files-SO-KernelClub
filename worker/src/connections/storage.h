@@ -40,8 +40,9 @@ int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t s
  * @return 0 si la operación fue exitosa, -1 en caso de error.
  */
 int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst, int worker_id);
-int commit_file_in_storage(int storage_socket, char *file, char *tag, int worker_id);
+int commit_file_in_storage(int storage_socket, int master_socket, char *file, char *tag, int worker_id);
 int delete_file_in_storage(int storage_socket, char *file, char *tag, int worker_id);
 int write_block_to_storage(int storage_socket, char *file, char *tag, uint32_t block_number, void *data, size_t size, int worker_id);
 
+void handler_error_from_storage(t_package *result, int master_socket);
 #endif

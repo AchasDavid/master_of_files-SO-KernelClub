@@ -282,7 +282,7 @@ int execute_instruction(instruction_t *instruction, int socket_storage, int sock
             if (flush_result != 0) {
                 return -1;
             }
-            int result = commit_file_in_storage(socket_storage, instruction->file_tag.file, instruction->file_tag.tag, worker_id);
+            int result = commit_file_in_storage(socket_storage, socket_master,instruction->file_tag.file, instruction->file_tag.tag, worker_id);
             if (result != 0) {
                 return -1;
             }

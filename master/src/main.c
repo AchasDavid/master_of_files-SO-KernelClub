@@ -218,6 +218,10 @@ void* handle_client(void* arg) {
                 log_info(master->logger, "Recibido WORKER_OP_DISCONNECTION de socket %d", client_socket);
                 handle_worker_disconnection(client_socket, master);
                 break;
+            case STORAGE_OP_ERROR:
+                log_error(master->logger, "Recibido STORAGE_OP_ERROR de socket %d", client_socket);
+                handle_error_from_storage(required_package, client_socket, master);
+                break;
             default:
                 log_warning(master->logger, "Operacion desconocida recibida del cliente %d", client_socket);
                 break;
