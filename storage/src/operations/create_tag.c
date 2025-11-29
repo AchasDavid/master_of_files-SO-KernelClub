@@ -7,7 +7,7 @@ int create_tag(uint32_t query_id, const char *file_src, const char *tag_src,
   int retval = 0;
 
   char dst_path[PATH_MAX];
-snprintf(dst_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point,
+  snprintf(dst_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point,
            file_dst, tag_dst);
   lock_file(file_dst, tag_dst, true);
 
@@ -21,11 +21,25 @@ snprintf(dst_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point,
     goto end;
   }
 
+  lock_file(file_src, tag_src, false);
+
+  t_file_metadata *metadata_src =
+      read_file_metadata(g_storage_config->mount_point, file_src, tag_src);
+  if (metadata_src == NULL) {
+    log_error(g_storage_logger,
+              "## %u - El tag de origen %s:%s no existe.",
+              query_id, file_src, tag_src);
+    retval = FILE_TAG_MISSING;
+    goto end;
+  }
+
+  destroy_file_metadata(metadata_src);
+
   char src_path[PATH_MAX];
   snprintf(src_path, PATH_MAX, "%s/files/%s/%s", g_storage_config->mount_point,
            file_src, tag_src);
 
-  lock_file(file_src, tag_src, false);
+  //lock_file(file_src, tag_src, false);
 
   char command[PATH_MAX * 2 + 32];
   snprintf(command, sizeof(command), "cp -rl \"%s\" \"%s\"", src_path,

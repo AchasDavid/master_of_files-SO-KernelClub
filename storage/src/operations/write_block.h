@@ -13,9 +13,6 @@
 #include "file_locks.h"
 #include "errors.h"
 
-#define IN_PROGRESS "WORK_IN_PROGRESS"
-#define COMMITTED "COMMITTED"
-
 /**
  * Maneja la solicitud de operación WRITE BLOCK recibida desde un Worker.
  * Deserializa los datos, invoca la lógica principal de escritura de bloque y
@@ -37,7 +34,7 @@ t_package *handle_write_block_request(t_package *package);
  * @param query_id Identificador de la consulta o petición en curso (usado para logs).
  * @param block_number Número de bloque lógico a escribir.
  * @param block_data Puntero a los datos binarios a escribir.
- * @param data_size Tamaño en bytes de block_data. *
+ * @param data_size Tamaño en bytes de block_data.
  * @return int 0 si la operación fue exitosa, negativo si falla
  */
 int execute_block_write(const char *name, const char *tag, uint32_t query_id,

@@ -93,7 +93,7 @@ int deserialize_block_write_request(t_package *package, uint32_t *query_id,
               *query_id);
     retval = -1;
     goto clean_tag;
-  } 
+  }
 
   return retval;
 
@@ -155,9 +155,9 @@ int write_to_logical_block(uint32_t query_id, const char *file_name,
     return -1;
   }
 
-usleep(g_storage_config->block_access_delay * 1000);
+  usleep(g_storage_config->block_access_delay * 1000);
 
-size_t block_size = g_storage_config->block_size;
+  size_t block_size = g_storage_config->block_size;
   void *buffer = calloc(1, block_size);
   if (buffer == NULL) {
     log_error(g_storage_logger,
@@ -299,7 +299,7 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
 
   if (write_to_logical_block(query_id, name, tag, block_number, block_data, data_size) < 0) {
     retval = -7;
-}
+  }
 
 
   goto cleanup_unlock;
