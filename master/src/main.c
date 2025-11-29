@@ -219,7 +219,6 @@ void* handle_client(void* arg) {
                 handle_worker_disconnection(client_socket, master);
                 break;
             case STORAGE_OP_ERROR:
-                log_error(master->logger, "Recibido STORAGE_OP_ERROR de socket %d", client_socket);
                 handle_error_from_storage(required_package, client_socket, master);
                 break;
             default:

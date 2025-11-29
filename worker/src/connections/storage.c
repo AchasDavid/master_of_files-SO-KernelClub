@@ -291,7 +291,6 @@ int commit_file_in_storage(int storage_socket, int master_socket,char *file, cha
         if (result->operation_code == STORAGE_OP_ERROR)
         {
             handler_error_from_storage(result, master_socket);
-            return 0; // No corto la operación del worker, solo informo el error al master
         }
                 
         if (result->operation_code == STORAGE_OP_TAG_COMMIT_RES)
@@ -387,7 +386,12 @@ void handler_error_from_storage(t_package *result, int master_socket){
     t_package *error_package = package_create_empty(STORAGE_OP_ERROR);
     package_add_uint32(error_package, query_id);
     package_add_string(error_package, error_message);
+
+/*     send_request_and_wait_ack(master_socket, error_package,
+                                               STORAGE_OP_ACK,
+                                               "error desde storage", 1); */
     package_send(error_package, master_socket);
+    
 
     free(error_message);
     package_destroy(error_package);
