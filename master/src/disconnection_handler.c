@@ -25,6 +25,7 @@ static bool match_query_by_id(void *elem) {
 static int search_worker_id = -1;
 
 /* static bool match_worker_by_id(void *element) {
+/* static bool match_worker_by_id(void *element) {
     t_worker_control_block *worker = (t_worker_control_block *) element;
     if (worker == NULL) return false;
     return (worker->worker_id == search_worker_id);
