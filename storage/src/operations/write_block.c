@@ -213,7 +213,7 @@ int execute_block_write(const char *name, const char *tag, uint32_t query_id,
   char *bitmap_buffer = NULL;
   int retval = 0;
 
-  lock_file(name, tag, true);
+  //lock_file(name, tag, true);
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,
@@ -333,7 +333,7 @@ cleanup_metadata:
   if (metadata)
     destroy_file_metadata(metadata);
 cleanup_unlock:
-  unlock_file(name, tag);
+  //unlock_file(name, tag);
 
   return retval;
 }

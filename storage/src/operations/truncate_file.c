@@ -18,7 +18,7 @@ int truncate_file(uint32_t query_id, const char *name, const char *tag,
                   int new_size_bytes, const char *mount_point) {
   int retval = 0;
 
-  lock_file(name, tag, true);
+  //lock_file(name, tag, true);
   t_file_metadata *metadata = read_file_metadata(mount_point, name, tag);
 
   if (!metadata) {
@@ -102,7 +102,7 @@ update_size:
 clean_metadata:
   destroy_file_metadata(metadata);
 unlock_only:
-  unlock_file(name, tag);
+  //unlock_file(name, tag);
   return retval;
 }
 

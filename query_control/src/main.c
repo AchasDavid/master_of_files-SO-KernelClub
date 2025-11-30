@@ -194,18 +194,40 @@ int main(int argc, char* argv[])
 
         case QC_OP_MASTER_FIN_DESCONEXION: 
         case OP_END_QUERY: {
-            const char* motivoString = NULL;
-            if(resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION){
-                motivoString = package_read_string(resp);
-            }else{
-                motivoString = "Finalización normal de la Query";
+            char* motivoString = NULL;
+            bool motivo_alocado = false;
+            
+            if (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) {
+                package_reset_read_offset(resp);
+                uint32_t qid = 0;
+                /* package_read_uint32 retorna true si lee exitosamente */
+                if (package_read_uint32(resp, &qid)) {
+                    /* Éxito: leer el mensaje de error */
+                    char *msg = package_read_string(resp);
+                    if (msg) {
+                        motivoString = msg;
+                        motivo_alocado = true;
+                    } else {
+                        motivoString = (char*)"Error desconocido en Storage (sin mensaje)";
+                    }
+                } else {
+                    /* Fallo al leer query_id: usar mensaje por defecto */
+                    motivoString = (char*)"Finalización por error en Storage";
+                }
+            } else {
+                /* OP_END_QUERY: finalización normal */
+                motivoString = (char*)"Finalización normal de la Query";
             }
-            motivoString = package_read_string(resp);
+            
             log_info(logger, "## Query Finalizada - %s", motivoString);
 
             package_destroy(resp); resp = NULL;
             retval = 0;
-            free((void*)motivoString);
+            
+            /* Liberar si fue alocado por package_read_string */
+            if (motivo_alocado && motivoString) {
+                free(motivoString);
+            }
             goto clean_socket;
         } break;
         

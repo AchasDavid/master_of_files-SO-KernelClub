@@ -273,6 +273,19 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
         }
         free(data);
     }
+    else if (result != 0 && result != -2)
+    {
+        // Error real en Storage (result == -1) o error desconocido: propagar error
+        if (logger)
+        {
+            log_error(logger, "Query %d: Error al leer bloque %d del archivo %s:%s desde Storage (result=%d)",
+                     mm->query_id, block_number, file, tag, result);
+        }
+        if (data)
+            free(data);
+        mm_free_frame(mm, frame);
+        return -1;
+    }
     else
     {
         // Bloque no existe (archivo recién creado/truncado) - inicializar con ceros

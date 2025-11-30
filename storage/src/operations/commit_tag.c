@@ -104,7 +104,7 @@ end:
 int execute_tag_commit(uint32_t query_id, const char *name, const char *tag) {
   int retval = 0;
 
-  lock_file(name, tag, false);
+  //lock_file(name, tag, false);
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,
@@ -171,7 +171,7 @@ cleanup_metadata:
   if (metadata)
     destroy_file_metadata(metadata);
 cleanup_unlock:
-  unlock_file(name, tag);
+  //unlock_file(name, tag);
 
   return retval;
 }

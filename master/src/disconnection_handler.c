@@ -442,7 +442,8 @@ int handle_error_from_storage(t_package *required_package, int client_socket, t_
     log_debug(master->logger, "[handle_error_from_storage] Error report recibido desde worker socket %d", client_socket);
 
     buffer_reset_offset(required_package->buffer);
-    uint32_t query_id;
+    uint32_t first_val;
+    package_read_uint32(required_package, &first_val);
 
     // Bloquear AMBOS mutexes
     if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
@@ -456,7 +457,7 @@ int handle_error_from_storage(t_package *required_package, int client_socket, t_
         return -1;
     }
 
-    if (!package_read_uint32(required_package, &query_id)) {
+/*     if (!package_read_uint32(required_package, &query_id)) {
         log_error(master->logger, "[handle_error_from_storage] Error al leer query ID del paquete");
         goto cleanup_and_exit;
     }
@@ -464,13 +465,9 @@ int handle_error_from_storage(t_package *required_package, int client_socket, t_
     if (query_id < 0) {
         log_error(master->logger, "[handle_error_from_storage] Query ID inválida: %d", query_id);
         goto cleanup_and_exit;
-    }
+    } */
 
     char *error_msg = package_read_string(required_package);
-    printf("Error message from Storage: %s\n", error_msg ? error_msg : "(null)");
-
-
-
 
 /*     // Intentar encontrar worker por ese primer valor (podría ser worker_id)
     search_worker_id = (int)first_val;
@@ -501,6 +498,14 @@ int handle_error_from_storage(t_package *required_package, int client_socket, t_
         log_error(master->logger, "[handle_error_from_storage] No se encontró worker con socket %d", client_socket);
         goto cleanup_and_exit;
     }
+
+    int query_id = wcb->current_query_id;
+    if (query_id < 0) {
+        log_error(master->logger, "[handle_error_from_storage] Worker ID=%d no tiene una query asignada", wcb->worker_id);
+        goto cleanup_and_exit;
+    }
+
+    printf("Worker ID=%d reportó error en Query ID=%u\n", wcb->worker_id, query_id);
     
     // Buscar query
     t_query_control_block *qcb = NULL;
@@ -520,12 +525,12 @@ int handle_error_from_storage(t_package *required_package, int client_socket, t_
     log_warning(master->logger, "[handle_error_from_storage] Query ID=%u reportó ERROR: %s",
                 query_id, error_msg ? error_msg : "(sin mensaje)");
 
-    // Actualizar estados
+/*     // Actualizar estados
     qcb->state = QUERY_STATE_CANCELED;
     qcb->assigned_worker_id = -1;
     
     // Remover de running_list
-    list_remove_element(master->queries_table->running_list, qcb);
+    list_remove_element(master->queries_table->running_list, qcb); */
     
     // Worker pasa a IDLE
     wcb->state = WORKER_STATE_IDLE;
