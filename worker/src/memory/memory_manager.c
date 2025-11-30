@@ -68,6 +68,7 @@ memory_manager_t *mm_create(size_t memory_size, size_t page_size, pt_replacement
     mm->entries = NULL;
     mm->storage_socket = -1;
     mm->worker_id = -1;
+    mm->master_socket = -1;
     mm->query_id = -1;
     mm->last_victim_file = NULL;
     mm->last_victim_tag = NULL;
@@ -101,6 +102,14 @@ void mm_set_storage_connection(memory_manager_t *mm, int storage_socket, int wor
 
     mm->storage_socket = storage_socket;
     mm->worker_id = worker_id;
+}
+
+void mm_set_master_connection(memory_manager_t *mm, int master_socket)
+{
+    if (!mm)
+        return;
+
+    mm->master_socket = master_socket;
 }
 
 void mm_set_query_id(memory_manager_t *mm, int query_id)
@@ -249,7 +258,7 @@ int mm_handle_page_fault(memory_manager_t *mm, page_table_t *pt, char *file, cha
     uint32_t block_number = page_number;
     void *data = NULL;
     size_t size = 0;
-    int result = read_block_from_storage(mm->storage_socket, file, tag, block_number, &data, &size, mm->query_id);
+    int result = read_block_from_storage(mm->storage_socket, mm->master_socket, file, tag, block_number, &data, &size, mm->query_id);
 
     if (result == 0 && data != NULL && size > 0)
     {
@@ -571,10 +580,10 @@ int mm_flush_query(memory_manager_t *mm, char *file, char *tag)
             return -1;
         }
 
-        int write_res = write_block_to_storage(mm->storage_socket,
-                                               file, tag, p->page_number,
-                                               frame_addr, mm->page_size,
-                                               mm->query_id);
+        int write_res = write_block_to_storage(mm->storage_socket, mm->master_socket,
+                               file, tag, p->page_number,
+                               frame_addr, mm->page_size,
+                               mm->query_id);
         if (write_res != 0)
         {
             if (logger)
@@ -664,7 +673,7 @@ int mm_flush_all_dirty(memory_manager_t *mm)
                 return -1;
             }
 
-            int write_res = write_block_to_storage(mm->storage_socket,
+            int write_res = write_block_to_storage(mm->storage_socket, mm->master_socket,
                                                    file, tag, p->page_number,
                                                    frame_addr, mm->page_size,
                                                    mm->query_id);
@@ -814,8 +823,8 @@ int mm_find_lru_victim(memory_manager_t *mm)
 
         void *frame_addr = mm_get_frame_address(mm, victim_frame);
 
-        int write_result = write_block_to_storage(
-            mm->storage_socket,
+            int write_result = write_block_to_storage(
+            mm->storage_socket, mm->master_socket,
             victim_file,
             victim_tag,
             victim_page,
@@ -981,7 +990,7 @@ int mm_find_clockm_victim(memory_manager_t *mm)
             void *frame_addr = mm_get_frame_address(mm, dirty_candidate_frame);
 
             int write_result = write_block_to_storage(
-                mm->storage_socket,
+                mm->storage_socket, mm->master_socket,
                 dirty_entry->file,
                 dirty_entry->tag,
                 dirty_page_idx,

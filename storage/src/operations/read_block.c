@@ -1,4 +1,5 @@
 #include "read_block.h"
+#include "error_messages.h"
 
 t_package *handle_read_block_request(t_package *package) {
   uint32_t query_id;
@@ -23,6 +24,25 @@ t_package *handle_read_block_request(t_package *package) {
   free(name);
   free(tag);
 
+  if (operation_result != 0) {
+    char *error_message = string_from_format("READ_BLOCK error: %s", storage_error_message(operation_result));
+    t_package *response = package_create_empty(STORAGE_OP_ERROR);
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32 " - Fallo al crear paquete de error.",
+                query_id);
+      free(read_buffer);
+      free(error_message);
+      return NULL;
+    }
+    package_add_uint32(response, query_id);
+    package_add_string(response, error_message);
+    free(error_message);
+    package_reset_read_offset(response);
+    free(read_buffer);
+    return response;
+  }
+
   t_package *response = package_create_empty(STORAGE_OP_BLOCK_READ_RES);
   if (!response) {
     log_error(g_storage_logger,
@@ -32,33 +52,25 @@ t_package *handle_read_block_request(t_package *package) {
     return NULL;
   }
 
-  // No hay concordancia con lo que espera el Worker
-  // Modifico el package que se envia a worker...
-  uint32_t data_size_to_send = 0;
-  if (operation_result == 0) {
-      data_size_to_send = (uint32_t) g_storage_config->block_size; // o el valor real devuelto por read
+  uint32_t data_size_to_send = (uint32_t) g_storage_config->block_size;
+
+  if (!package_add_uint32(response, data_size_to_send)) {
+    log_error(g_storage_logger,
+              "## Query ID: %" PRIu32 " - Error al escribir tamaño en respuesta de READ BLOCK", query_id);
+    package_destroy(response);
+    free(read_buffer);
+    return NULL;
   }
 
-  // Agrego el tamaño (si es 0, indica ausencia de datos).
-  if (!package_add_uint32(response, data_size_to_send)) {
+  if (data_size_to_send > 0) {
+    if (!package_add_data(response, read_buffer, data_size_to_send)) {
       log_error(g_storage_logger,
-                "## Query ID: %" PRIu32 " - Error al escribir tamaño en respuesta de READ BLOCK", query_id);
+                "## Query ID: %" PRIu32 " - Error al escribir contenido binario del bloque en respuesta.", query_id);
       package_destroy(response);
       free(read_buffer);
       return NULL;
+    }
   }
-
-  // Si hay datos válidos, agregamos los bytes "crudos" (se convierte a string en master)
-  if (operation_result == 0 && data_size_to_send > 0) {
-      if (!package_add_data(response, read_buffer, data_size_to_send)) {
-          log_error(g_storage_logger,
-                    "## Query ID: %" PRIu32 " - Error al escribir contenido binario del bloque en respuesta.", query_id);
-          package_destroy(response);
-          free(read_buffer);
-          return NULL;
-      }
-  }
-
 
 /*   if (!package_add_int8(response, (int8_t)operation_result)) {
     log_error(g_storage_logger,

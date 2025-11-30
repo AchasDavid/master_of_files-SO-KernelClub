@@ -1,5 +1,6 @@
 #include "create_tag.h"
 #include "../file_locks.h"
+#include "error_messages.h"
 #include <limits.h>
 
 int create_tag(uint32_t query_id, const char *file_src, const char *tag_src,
@@ -141,6 +142,22 @@ t_package *handle_create_tag_op_package(t_package *package) {
   free(tag_src);
   free(file_dst);
   free(tag_dst);
+
+  if (operation_result != 0) {
+    char *error_message = string_from_format("CREATE_TAG error: %s", storage_error_message(operation_result));
+    t_package *response = package_create_empty(STORAGE_OP_ERROR);
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Error al crear el paquete de error para CREATE_TAG");
+      free(error_message);
+      return NULL;
+    }
+    package_add_uint32(response, query_id);
+    package_add_string(response, error_message);
+    free(error_message);
+    package_reset_read_offset(response);
+    return response;
+  }
 
   t_package *response = package_create_empty(STORAGE_OP_TAG_CREATE_RES);
   if (!response) {

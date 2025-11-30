@@ -38,7 +38,7 @@ static int send_request_and_wait_ack_with_error_handling(int storage_socket,
     if (response->operation_code == STORAGE_OP_ERROR)
     {
         log_error(logger, "[send_request_and_wait_ack_with_error_handling] Storage reportó un error para la operación: %s", operation_name);
-        handler_error_from_storage(response, master_socket);
+        handler_error_from_storage(response, master_socket, worker_id);
         package_destroy(response);
         return -1;
     }
@@ -169,7 +169,7 @@ int get_block_size(int storage_socket, uint16_t *block_size, int worker_id)
     return 0;
 }
 
-int read_block_from_storage(int storage_socket, char *file, char *tag, uint32_t block_number, void **data, size_t *size, int worker_id)
+int read_block_from_storage(int storage_socket, int master_socket, char *file, char *tag, uint32_t block_number, void **data, size_t *size, int worker_id)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_BLOCK_READ_REQ);
@@ -209,6 +209,7 @@ int read_block_from_storage(int storage_socket, char *file, char *tag, uint32_t 
     if (response->operation_code == STORAGE_OP_ERROR)
     {
         log_error(logger, "Storage reportó error en lectura de bloque del archivo %s:%s", file, tag);
+        handler_error_from_storage(response, master_socket, worker_id);
         package_destroy(response);
         return -1;
     }
@@ -256,7 +257,7 @@ int read_block_from_storage(int storage_socket, char *file, char *tag, uint32_t 
     return 0;
 }
 
-int create_file_in_storage(int storage_socket, int worker_id, char *file, char *tag)
+int create_file_in_storage(int storage_socket, int master_socket, int worker_id, char *file, char *tag)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_FILE_CREATE_REQ);
@@ -266,9 +267,33 @@ int create_file_in_storage(int storage_socket, int worker_id, char *file, char *
         package_add_string(request, file) &&
         package_add_string(request, tag))
     {
-        return send_request_and_wait_ack(storage_socket, request,
+/*         int res = send_request_and_wait_ack(storage_socket, request,
                                          STORAGE_OP_FILE_CREATE_RES,
-                                         "creación de archivo", worker_id);
+                                         "creación de archivo", worker_id); */
+        package_send(request, storage_socket);
+        package_destroy(request);
+
+        t_package *storage_response = package_receive(storage_socket);
+        if (!storage_response) {
+            log_error(logger, "Error al recibir la respuesta de creación de archivo del Storage");
+            return -1;
+        }
+        int res = 0;
+        if (storage_response->operation_code == STORAGE_OP_FILE_CREATE_RES) {
+            log_debug(logger, "Recibo ACK por parte de storage a intruccion create archivo %s:%s realizada con éxito", file, tag);
+            res = 0;
+        } else if (storage_response->operation_code == STORAGE_OP_ERROR) {
+            log_error(logger, "Storage reportó error en creación de archivo %s:%s", file, tag);
+            handler_error_from_storage(storage_response, master_socket, worker_id);
+            res = -1;
+        } else {
+            log_error(logger, "Tipo de paquete inesperado para la respuesta de creación de archivo...");
+            res = -1;
+        }
+
+        package_destroy(storage_response);
+        
+        return res;
     }
 
     log_error(logger, "Error al preparar el paquete para crear archivo");
@@ -277,7 +302,7 @@ int create_file_in_storage(int storage_socket, int worker_id, char *file, char *
     return -1;
 }
 
-int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t size, int worker_id)
+int truncate_file_in_storage(int storage_socket, int master_socket, char *file, char *tag, size_t size, int worker_id)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_FILE_TRUNCATE_REQ);
@@ -305,7 +330,7 @@ int truncate_file_in_storage(int storage_socket, char *file, char *tag, size_t s
     return -1;
 }
 
-int fork_file_in_storage(int storage_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst, int worker_id)
+int fork_file_in_storage(int storage_socket, int master_socket, char *file_src, char *tag_src, char *file_dst, char *tag_dst, int worker_id)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_TAG_CREATE_REQ);
@@ -363,7 +388,7 @@ int commit_file_in_storage(int storage_socket, int master_socket,char *file, cha
         if (result->operation_code == STORAGE_OP_ERROR)
         {
             log_error(logger, "[commit_file_in_storage] Storage reportó error en commit de archivo %s:%s", file, tag);
-            handler_error_from_storage(result, master_socket);
+            handler_error_from_storage(result, master_socket, worker_id);
             package_destroy(result);
             return -1;
         }
@@ -387,7 +412,7 @@ int commit_file_in_storage(int storage_socket, int master_socket,char *file, cha
     return -1;
 }
 
-int write_block_to_storage(int storage_socket, char *file, char *tag, uint32_t block_number, void *data, size_t size, int worker_id)
+int write_block_to_storage(int storage_socket, int master_socket, char *file, char *tag, uint32_t block_number, void *data, size_t size, int worker_id)
 {
     t_log *logger = logger_get();
     t_package *request = package_create_empty(STORAGE_OP_BLOCK_WRITE_REQ);
@@ -428,6 +453,7 @@ int write_block_to_storage(int storage_socket, char *file, char *tag, uint32_t b
     if (response->operation_code == STORAGE_OP_ERROR)
     {
         log_error(logger, "Storage reportó error en escritura de bloque del archivo %s:%s", file, tag);
+        handler_error_from_storage(response, master_socket, worker_id);
         package_destroy(response);
         return -1;
     }
@@ -447,7 +473,7 @@ int write_block_to_storage(int storage_socket, char *file, char *tag, uint32_t b
     return 0;
 }
 
-int delete_file_in_storage(int storage_socket, char *file, char *tag, int worker_id)
+int delete_file_in_storage(int storage_socket, int master_socket, char *file, char *tag, int worker_id)
 {
     // Nota: Esta función no tiene acceso a master_socket, por lo que no puede notificar errores
     // Los errores serán capturados en query_interpreter.c y manejados allí
@@ -476,10 +502,12 @@ int delete_file_in_storage(int storage_socket, char *file, char *tag, int worker
     return -1;
 }
 
-void handler_error_from_storage(t_package *result, int master_socket){
+void handler_error_from_storage(t_package *result, int master_socket, int worker_id){
     t_log *logger = logger_get();
 
+    printf("Handler de error desde Storage para worker_id=%d\n", worker_id);
     if (!result || !logger) {
+        printf("Paquete de error inválido o logger no disponible\n");
         if (logger) {
             log_error(logger, "[handler_error_from_storage] Paquete de error inválido");
         }

@@ -1,4 +1,5 @@
 #include "commit_tag.h"
+#include "error_messages.h"
 
 t_package *handle_tag_commit_request(t_package *package) {
   uint32_t query_id;
@@ -12,19 +13,22 @@ t_package *handle_tag_commit_request(t_package *package) {
 
   int operation_result = execute_tag_commit(query_id, name, tag);
 
-  if(operation_result == FILE_ALREADY_COMMITTED) {
-    // handleo el error de que ya está commiteado
-    char *error_message = string_from_format(
-        "El archivo %s:%s ya está en estado 'COMMITTED'.", name, tag);
-
+  if (operation_result != 0) {
+    char *error_message = string_from_format("COMMIT_TAG error: %s", storage_error_message(operation_result));
     response = package_create_empty(STORAGE_OP_ERROR);
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Query ID: %" PRIu32 " - Fallo al crear paquete de error.",
+                query_id);
+      free(error_message);
+      return NULL;
+    }
     package_add_uint32(response, query_id);
     package_add_string(response, error_message);
-  }
-  
-  if(operation_result == 0) {
+    free(error_message);
+  } else {
     response = package_create_empty(STORAGE_OP_TAG_COMMIT_RES);
- 
+
     if (!response) {
       log_error(g_storage_logger,
                 "## Query ID: %" PRIu32 " - Fallo al crear paquete de respuesta.",

@@ -2,6 +2,7 @@
 #include "../file_locks.h"
 #include "../utils/filesystem_utils.h"
 #include "globals/globals.h"
+#include "error_messages.h"
 #include <commons/config.h>
 #include <commons/string.h>
 #include <limits.h>
@@ -138,6 +139,22 @@ t_package *handle_truncate_file_op_package(t_package *package) {
 
   free(name);
   free(tag);
+
+  if (operation_result != 0) {
+    char *error_message = string_from_format("TRUNCATE_FILE error: %s", storage_error_message(operation_result));
+    t_package *response = package_create_empty(STORAGE_OP_ERROR);
+    if (!response) {
+      log_error(g_storage_logger,
+                "## Error al crear el paquete de error para TRUNCATE_FILE");
+      free(error_message);
+      return NULL;
+    }
+    package_add_uint32(response, query_id);
+    package_add_string(response, error_message);
+    free(error_message);
+    package_reset_read_offset(response);
+    return response;
+  }
 
   t_package *response = package_create_empty(STORAGE_OP_FILE_TRUNCATE_RES);
   if (!response) {

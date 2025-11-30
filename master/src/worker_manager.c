@@ -409,7 +409,7 @@ int manage_worker_end_query(t_buffer *buffer, int client_socket, t_master *maste
     // Notificar al QC CON mutexes tomados
     int qc_socket = qcb->socket_fd;
     if (qc_socket > 0) {
-        t_package *resp = package_create_empty(OP_MASTER_QUERY_END);
+        t_package *resp = package_create_empty(OP_END_QUERY);
         if (resp) {
             package_add_uint32(resp, (uint32_t)qcb->query_id);
             if (package_send(resp, qc_socket) != 0) {

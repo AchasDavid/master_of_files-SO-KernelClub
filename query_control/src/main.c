@@ -192,17 +192,20 @@ int main(int argc, char* argv[])
             free(file_data);
         } break;
 
-        case QC_OP_MASTER_FIN_DESCONEXION:
-        case OP_MASTER_QUERY_END: {
-
-
-            const char* motivoString =
-            (resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION) ? "DESCONEXION" : "finalización de Query";
-
+        case QC_OP_MASTER_FIN_DESCONEXION: 
+        case OP_END_QUERY: {
+            const char* motivoString = NULL;
+            if(resp->operation_code == QC_OP_MASTER_FIN_DESCONEXION){
+                motivoString = package_read_string(resp);
+            }else{
+                motivoString = "Finalización normal de la Query";
+            }
+            motivoString = package_read_string(resp);
             log_info(logger, "## Query Finalizada - %s", motivoString);
 
             package_destroy(resp); resp = NULL;
             retval = 0;
+            free((void*)motivoString);
             goto clean_socket;
         } break;
         

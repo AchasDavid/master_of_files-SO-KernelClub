@@ -441,6 +441,9 @@ int handle_error_from_storage(t_package *required_package, int client_socket, t_
 
     log_debug(master->logger, "[handle_error_from_storage] Error report recibido desde worker socket %d", client_socket);
 
+    buffer_reset_offset(required_package->buffer);
+    uint32_t query_id;
+
     // Bloquear AMBOS mutexes
     if (pthread_mutex_lock(&master->workers_table->worker_table_mutex) != 0) {
         log_error(master->logger, "[handle_error_from_storage] Error al bloquear worker_table_mutex");
@@ -453,10 +456,44 @@ int handle_error_from_storage(t_package *required_package, int client_socket, t_
         return -1;
     }
 
-    buffer_reset_offset(required_package->buffer);
-    uint32_t worker_id;
-    package_read_uint32(required_package, &worker_id);
+    if (!package_read_uint32(required_package, &query_id)) {
+        log_error(master->logger, "[handle_error_from_storage] Error al leer query ID del paquete");
+        goto cleanup_and_exit;
+    }
+    
+    if (query_id < 0) {
+        log_error(master->logger, "[handle_error_from_storage] Query ID inválida: %d", query_id);
+        goto cleanup_and_exit;
+    }
+
     char *error_msg = package_read_string(required_package);
+    printf("Error message from Storage: %s\n", error_msg ? error_msg : "(null)");
+
+
+
+
+/*     // Intentar encontrar worker por ese primer valor (podría ser worker_id)
+    search_worker_id = (int)first_val;
+    t_worker_control_block *wcb = list_find(master->workers_table->worker_list, match_worker_by_id);
+
+    if (wcb) {
+        // Formato con worker_id presente. Leer query_id a continuación.
+        uint32_t worker_id = first_val;
+        if (!package_read_uint32(required_package, &query_id)) {
+            // Si no viene query_id, intentar obtenerlo desde el worker por socket
+            log_warning(master->logger, "[handle_error_from_storage] No se encontró query_id en paquete tras worker_id; intentando obtener desde worker socket %d", client_socket);
+            // buscar por socket
+            wcb = find_worker_by_socket(master->workers_table, client_socket);
+            if (!wcb) {
+                log_error(master->logger, "[handle_error_from_storage] No se encontró worker con socket %d", client_socket);
+                goto cleanup_and_exit;
+            }
+            query_id = (uint32_t) wcb->current_query_id;
+        }
+    } else {
+        // El primer valor es probablemente query_id (formato {query_id, msg})
+        query_id = first_val;
+ */
 
     // Buscar worker por socket
     t_worker_control_block *wcb = find_worker_by_socket(master->workers_table, client_socket);
@@ -464,30 +501,24 @@ int handle_error_from_storage(t_package *required_package, int client_socket, t_
         log_error(master->logger, "[handle_error_from_storage] No se encontró worker con socket %d", client_socket);
         goto cleanup_and_exit;
     }
-
-    uint32_t qid = wcb->current_query_id;
-    if (qid <= 0) {
-        log_error(master->logger, "[handle_error_from_storage] Worker ID=%d no tiene query asignada", wcb->worker_id);
-        goto cleanup_and_exit;
-    }
-
+    
     // Buscar query
     t_query_control_block *qcb = NULL;
     for (int i = 0; i < list_size(master->queries_table->running_list); i++) {
         t_query_control_block *q = list_get(master->queries_table->running_list, i);
-        if (q && q->query_id == qid) {
+        if (q && q->query_id == query_id) {
             qcb = q;
             break;
         }
     }
 
     if (!qcb) {
-        log_error(master->logger, "[handle_error_from_storage] Query ID=%u no encontrada en running_list", qid);
+        log_error(master->logger, "[handle_error_from_storage] Query ID=%u no encontrada en running_list", query_id);
         goto cleanup_and_exit;
     }
 
     log_warning(master->logger, "[handle_error_from_storage] Query ID=%u reportó ERROR: %s",
-                qid, error_msg ? error_msg : "(sin mensaje)");
+                query_id, error_msg ? error_msg : "(sin mensaje)");
 
     // Actualizar estados
     qcb->state = QUERY_STATE_CANCELED;

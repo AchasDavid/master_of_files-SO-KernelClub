@@ -52,14 +52,29 @@ void *query_executor_thread(void *arg)
         {
             if (result == QUERY_RESULT_ERROR)
             {
-                mm_flush_all_dirty(state->memory_manager);                
+                mm_flush_all_dirty(state->memory_manager);
                 notify_master_query_error(state, ctx.query_id, ctx.program_counter);
             }
 
-            state->has_query = false;
+            /*
+             * Sólo limpiar la bandera has_query si aún corresponde a la query que
+             * nosotros estábamos ejecutando. Es posible que durante la ventana entre
+             * el fin de ejecución y este bloqueo, el hilo listener ya haya asignado
+             * una nueva query (nuevo query_id). En ese caso no debemos borrar
+             * has_query porque eso cancelaría la asignación nueva y dejaría el
+             * worker colgado.
+             */
+            if (state->has_query == true) {
+                if (state->current_query.query_id == ctx.query_id) {
+                    state->has_query = false;
+                } else {
+                    /* Otra query ya fue asignada; conservar has_query true */
+                }
+            }
+
             state->is_executing = false;
-            log_info(state->logger, "## Query %d: %s", 
-                     ctx.query_id, 
+            log_info(state->logger, "## Query %d: %s",
+                     ctx.query_id,
                      (result == QUERY_RESULT_END ? "Finalizada" : "Abortada"));
         }
 
