@@ -146,7 +146,7 @@ int execute_block_read(const char *name, const char *tag, uint32_t query_id,
                         uint32_t block_number, void *read_buffer) {
   int retval = 0;
 
-  lock_file(name, tag, false);
+  //lock_file(name, tag, false);
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,
@@ -187,7 +187,9 @@ cleanup_metadata:
   if (metadata)
     destroy_file_metadata(metadata);
 cleanup_unlock:
-  unlock_file(name, tag);
+  //unlock_file(name, tag);
+
+usleep(g_storage_config->block_access_delay * 1000);
 
   return retval;
 }
@@ -195,7 +197,7 @@ cleanup_unlock:
 int read_from_logical_block(uint32_t query_id, const char *file_name,
                            const char *tag, uint32_t block_number, void *read_buffer) {
   int retval = 0;
-                              
+
   char logical_block_path[PATH_MAX];
   snprintf(logical_block_path, sizeof(logical_block_path),
            "%s/files/%s/%s/logical_blocks/%04" PRIu32 ".dat",
@@ -203,39 +205,30 @@ int read_from_logical_block(uint32_t query_id, const char *file_name,
 
   FILE *block_file = fopen(logical_block_path, "rb");
   if (block_file == NULL) {
-    log_error(g_storage_logger,
-              "## Query ID: %" PRIu32 " - No se pudo abrir el bloque %s para lectura.",
+    log_error(g_storage_logger, "## Query ID: %" PRIu32 " - No se pudo abrir el bloque %s para lectura.",
               query_id, logical_block_path);
-    retval = -1;
-    goto end;
+    return -1;
   }
 
-  usleep(g_storage_config->block_access_delay * 1000);
-
   size_t bytes_leidos = fread(read_buffer, 1, g_storage_config->block_size, block_file);
-  
+
   if (bytes_leidos != g_storage_config->block_size) {
     if (ferror(block_file)) {
-      log_error(g_storage_logger,
-                "## Query ID: %" PRIu32 " - Error de lectura en el bloque: %s. Faltan bytes.",
+      log_error(g_storage_logger, "## Query ID: %" PRIu32 " - Error de lectura en el bloque: %s.",
                 query_id, logical_block_path);
       retval = -2;
-      goto close_file;
+    } else {
+      log_error(g_storage_logger, "## Query ID: %" PRIu32 " - Lectura parcial o EOF inesperado.",
+                query_id);
+      retval = -3;
     }
-
-    log_error(g_storage_logger,
-              "## Query ID: %" PRIu32 " - Lectura parcial o EOF inesperado en bloque: %s",
-              query_id, logical_block_path);
-    retval = -3;
-    goto close_file;
   } else {
     ((char*)read_buffer)[g_storage_config->block_size] = '\0';
   }
 
-  log_info(g_storage_logger, "## Query ID: %" PRIu32 " - Bloque lógico leído %s:%s - Número de bloque: %" PRIu32, query_id, file_name, tag, block_number);
-  
-close_file:
+  log_info(g_storage_logger, "## Query ID: %" PRIu32 " - Bloque lógico leído %s:%s - Número de bloque: %" PRIu32, 
+           query_id, file_name, tag, block_number);
+
   fclose(block_file);
-end:  
   return retval;
 }

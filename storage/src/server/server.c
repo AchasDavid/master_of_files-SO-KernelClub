@@ -78,6 +78,9 @@ void *handle_client(void *arg) {
       goto cleanup;
     }
 
+    // simulo retardo de operacion 
+    usleep(g_storage_config->operation_delay * 1000);
+    
     package_send(response, client_socket);
 
     package_destroy(response);
