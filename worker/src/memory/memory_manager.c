@@ -378,7 +378,6 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
         if (bytes_to_copy > remaining)
             bytes_to_copy = remaining;
 
-        usleep(mm->memory_retardation * 1000);
         if (write)
             memcpy(frame_addr + offset, ptr, bytes_to_copy);
         else
@@ -423,6 +422,9 @@ static int mm_access_memory(memory_manager_t *mm, page_table_t *pt, char *file, 
         current_page++;
         offset = 0;
     }
+
+    // Retardo de memoria simulado
+    usleep(mm->memory_retardation * 1000);
 
     return 0;
 }
