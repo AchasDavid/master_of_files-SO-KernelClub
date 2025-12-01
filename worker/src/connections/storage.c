@@ -76,16 +76,6 @@ static int send_request_and_wait_ack(int storage_socket,
         return -1;
     }
 
-    // Verificar si Storage reportó un error
-    if (response->operation_code == STORAGE_OP_ERROR)
-    {
-        log_error(logger, "Storage reportó un error para la operación: %s", operation_name);
-        // El handler_error_from_storage se llamará desde donde se use esta función
-        // si es necesario (en funciones que tengan acceso a master_socket)
-        package_destroy(response);
-        return -1;
-    }
-
     if (response->operation_code != expected_response_code)
     {
         log_error(logger, "Tipo de paquete inesperado para la respuesta de %s (esperado=%u, recibido=%u)",
@@ -207,38 +197,6 @@ int read_block_from_storage(int storage_socket, int master_socket, char *file, c
         return -1;
     }
 
-   /*  if (package_send(request, storage_socket) != 0)
-    {
-        log_error(logger, "Error al enviar la solicitud de lectura de bloque al Storage");
-        package_destroy(request);
-        return -1;
-    }
-    package_destroy(request);
-
-    t_package *response = package_receive(storage_socket);
-    if (!response)
-    {
-        log_error(logger, "Error al recibir la respuesta de lectura de bloque del Storage");
-        return -1;
-    }
-
-    // Verificar si Storage reportó un error
-    if (response->operation_code == STORAGE_OP_ERROR)
-    {
-        log_error(logger, "Storage reportó error en lectura de bloque del archivo %s:%s", file, tag);
-        handler_error_from_storage(response, master_socket, worker_id);
-        package_destroy(response);
-        return -1;
-    }
-
-    if (response->operation_code != STORAGE_OP_BLOCK_READ_RES)
-    {
-        log_error(logger, "Tipo de paquete inesperado para la respuesta de lectura de bloque (esperado=%u, recibido=%u)",
-                  (unsigned)STORAGE_OP_BLOCK_READ_RES, (unsigned)response->operation_code);
-        package_destroy(response);
-        return -1;
-    }
- */
     uint32_t data_size = 0;
     if (!package_read_uint32(storage_response, &data_size))
     {

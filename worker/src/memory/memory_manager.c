@@ -769,7 +769,7 @@ int mm_find_lru_victim(memory_manager_t *mm)
     uint32_t victim_frame = (uint32_t)-1;
     char *victim_file = NULL;
     char *victim_tag = NULL;
-    uint32_t victim_page = (uint32_t)-1;
+    uint32_t victim_page = UINT32_MAX;
     page_table_t *victim_pt = NULL;
 
     uint32_t total_pages_checked = 0;
@@ -808,7 +808,7 @@ int mm_find_lru_victim(memory_manager_t *mm)
                  victim_frame != (uint32_t)-1 ? "Sí" : "No");
     }
 
-    if (victim_frame == (uint32_t)-1)
+    if (victim_frame == UINT32_MAX)
     {
         if (logger)
         {
