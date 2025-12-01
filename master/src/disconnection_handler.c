@@ -13,27 +13,19 @@
 #include "worker_manager.h"
 #include "connection/serialization.h"
 
-// --- Query por ID ---
+// Variables estáticas para predicados de búsqueda
 static int running_query_id_for_predicate = -1;
+static int search_worker_id = -1;
+static int search_query_socket_fd = -1;
+static int search_worker_socket_fd = -1;
 
+// --- Query por ID ---
 static bool match_query_by_id(void *elem) {
     t_query_control_block *query = (t_query_control_block*)elem;
     return query && (query->query_id == running_query_id_for_predicate);
 }
 
-// --- Worker por ID ---
-static int search_worker_id = -1;
-
-/* static bool match_worker_by_id(void *element) {
-/* static bool match_worker_by_id(void *element) {
-    t_worker_control_block *worker = (t_worker_control_block *) element;
-    if (worker == NULL) return false;
-    return (worker->worker_id == search_worker_id);
-}
- */
 // --- Query por socket_fd ---
-static int search_query_socket_fd = -1;
-
 static bool match_query_by_socket(void *element) {
     t_query_control_block *query = (t_query_control_block *)element;
     if (!query) return false;
@@ -41,14 +33,11 @@ static bool match_query_by_socket(void *element) {
 }
 
 // --- Worker por socket_fd ---
-static int search_worker_socket_fd = -1;
-
 static bool match_worker_by_socket(void *element) {
     t_worker_control_block *worker = (t_worker_control_block *)element;
     if (!worker) return false;
     return (worker->socket_fd == search_worker_socket_fd);
 }
-
 
 int handle_query_control_disconnection(int client_socket, t_master *master) {
     if (master == NULL || master->queries_table == NULL) {
@@ -193,55 +182,6 @@ void cancel_query_in_ready(t_query_control_block *qcb, t_master *master) {
 
     finalize_query_with_error(qcb, master, "Se cancela Query - QC desconectada (READY)");
 }
-
-/* Reemplazada por preempt_query_in_exec
-
-    int cancel_query_in_exec(t_query_control_block *qcb, t_master *master) {
-        if (!qcb || !master) return -1;
-
-    if (qcb->preemption_pending) {
-        // Ya hay un desalojo en curso para esta query
-        // No hacer nada
-        return 0;
-    }
-
-    search_worker_id = qcb->assigned_worker_id;
-    t_worker_control_block *worker = list_find(
-        master->workers_table->worker_list,
-        match_worker_by_id
-    );
-
-    if (!worker || worker->socket_fd <= 0) {
-        log_error(master->logger,
-            "[preempt_query_in_exec] Worker inválido durante preemption. Finalizando Query ID=%d",
-            qcb->query_id
-        );
-
-        finalize_query_with_error(qcb, master, "Error en preemption");
-        cleanup_query_resources(qcb, master);
-        return -1;
-    }
-
-    // Marcar que hay un desalojo pendiente
-    qcb->preemption_pending = true;
-
-    // Envío solicitud de desalojo, la respuesta la manejo en el worker_manager
-    t_package *pkg = package_create_empty(OP_WORKER_PREEMPT_REQ);
-    package_add_uint32(pkg, (uint32_t)qcb->query_id);
-    package_send(pkg, worker->socket_fd);
-    package_destroy(pkg);
-
-
-
-    log_info(master->logger,
-        "## Se desaloja la Query id: %d (<PRIORIDAD: %d>) del Worker <WORKER_ID: %d> - Motivo: DESCONEXIÓN QC",
-        qcb->query_id, qcb->priority, worker->worker_id
-    );
-
-    return 0;
-
-} */
-
 
 /**
  * handle_eviction_response:
