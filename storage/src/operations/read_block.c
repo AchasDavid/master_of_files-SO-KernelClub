@@ -127,7 +127,8 @@ int execute_block_read(const char *name, const char *tag, uint32_t query_id,
                         uint32_t block_number, void *read_buffer) {
   int retval = 0;
 
-  //lock_file(name, tag, false);
+  lock_file(name, tag, false);
+  log_debug(g_storage_logger, "/**** Query ID %" PRIu32 ": Lock de lectura adquirido.", query_id);
 
   if (!file_dir_exists(name, tag)) {
     log_error(g_storage_logger,
@@ -168,9 +169,9 @@ cleanup_metadata:
   if (metadata)
     destroy_file_metadata(metadata);
 cleanup_unlock:
-  //unlock_file(name, tag);
-
-usleep(g_storage_config->block_access_delay * 1000);
+  unlock_file(name, tag);
+  log_debug(g_storage_logger, "/**** Query ID %" PRIu32 ": Lock de lectura liberado.", query_id);
+  usleep(g_storage_config->block_access_delay/2 * 1000);
 
   return retval;
 }
@@ -190,6 +191,10 @@ int read_from_logical_block(uint32_t query_id, const char *file_name,
               query_id, logical_block_path);
     return -1;
   }
+
+  usleep(g_storage_config->block_access_delay/2 * 1000);
+          
+  sched_yield();
 
   size_t bytes_leidos = fread(read_buffer, 1, g_storage_config->block_size, block_file);
 
