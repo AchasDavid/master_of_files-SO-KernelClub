@@ -1,7 +1,47 @@
-# tp-scaffold
+# Master of Files - Sistema Distribuido de Gestión de Archivos
 
-Esta es una plantilla de proyecto diseñada para generar un TP de Sistemas
-Operativos de la UTN FRBA.
+**Master of Files** es un proyecto desarrollado para la cátedra de Sistemas Operativos (UTN-FRBA) que consiste en un sistema distribuido capaz de gestionar archivos y ejecutar consultas (queries) de forma eficiente. El sistema implementa conceptos avanzados de planificación, gestión de memoria y persistencia de datos en un entorno multimodular.
+
+---
+
+## Arquitectura del Sistema
+
+El sistema está compuesto por cuatro módulos independientes que se comunican mediante sockets:
+
+| Módulo | Función | Responsabilidad Técnica |
+| :--- | :--- | :--- |
+| **Query Control (QC)** | Interfaz de Usuario | Cliente que envía scripts de consultas y gestiona la prioridad de ejecución. |
+| **Master** | Kernel | Administra la conexión de Workers, planifica las tareas y maneja el flujo de datos. |
+| **Worker** | Unidad de Cómputo | Interpreta instrucciones, gestiona una memoria caché con paginación y ejecuta las operaciones. |
+| **Storage** | Persistencia (FS) | Gestiona el almacenamiento físico, estructuras de control (Bitmap/Superbloque) e integridad (Hashing). |
+
+---
+
+## Conceptos de Sistemas Operativos Aplicados
+
+### 1. Planificación (Scheduling)
+El módulo **Master** actúa como el planificador de largo y corto plazo, implementando:
+* **FIFO (First-In-First-Out):** Procesamiento por orden de llegada.
+* **Prioridades con Desalojo:** Interrupción de tareas en ejecución ante la llegada de procesos más críticos.
+* **Aging (envejecimiento):** Prevención de la inanición (*starvation*) mediante el incremento dinámico de la prioridad de tareas en espera.
+
+### 2. Gestión de Memoria
+Cada **Worker** administra su propia memoria interna simulando una jerarquía de memoria:
+* **Paginación a Demanda:** Carga de datos solo cuando la instrucción lo requiere.
+* **Algoritmos de Reemplazo:** Gestión de espacio mediante **LRU** (Least Recently Used) y **CLOCK-M** (Reloj Modificado).
+* **Coherencia de Datos:** Implementación de *Dirty Bit* (bit de modificación) para sincronizar cambios con el Storage solo cuando es necesario (Write-back).
+
+### 3. Sistema de Archivos (File Systems)
+El **Storage** emula un File System con las siguientes características:
+* **Estructuras Administrativas:** Manejo de un *Superbloque* para configuración y un *Bitmap* para la gestión de bloques libres/ocupados.
+* **Persistencia Real:** Almacenamiento binario de bloques y gestión de metadata por cada archivo y tag.
+* **Integridad:** Generación de índices basados en **Hash** para cada bloque de datos almacenado.
+
+### 4. Concurrencia y Comunicación
+* **Sockets de Red:** Comunicación inter-proceso (IPC) en un entorno distribuido.
+* **Manejo de Contextos:** Capacidad de interrumpir una tarea, guardar su estado y retomarla posteriormente sin pérdida de datos.
+
+---
 
 ## Dependencias
 
